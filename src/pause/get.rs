@@ -20,7 +20,8 @@ impl EthtoolPauseGetRequest {
 
     pub async fn execute(
         self,
-    ) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError> {
+    ) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError>
+    {
         let EthtoolPauseGetRequest {
             mut handle,
             iface_name,

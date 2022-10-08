@@ -11,15 +11,22 @@ macro_rules! try_ethtool {
                 let (header, payload) = msg.into_parts();
                 match payload {
                     NetlinkPayload::InnerMessage(msg) => msg,
-                    NetlinkPayload::Error(err) => return Err(EthtoolError::NetlinkError(err)),
+                    NetlinkPayload::Error(err) => {
+                        return Err(EthtoolError::NetlinkError(err))
+                    }
                     _ => {
-                        return Err(EthtoolError::UnexpectedMessage(NetlinkMessage::new(
-                            header, payload,
-                        )))
+                        return Err(EthtoolError::UnexpectedMessage(
+                            NetlinkMessage::new(header, payload),
+                        ))
                     }
                 }
             }
-            Err(e) => return Err(EthtoolError::Bug(format!("BUG: decode error {:?}", e))),
+            Err(e) => {
+                return Err(EthtoolError::Bug(format!(
+                    "BUG: decode error {:?}",
+                    e
+                )))
+            }
         }
     }};
 }

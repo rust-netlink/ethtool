@@ -2,18 +2,15 @@
 
 use futures::{future::Either, FutureExt, Stream, StreamExt, TryStream};
 use genetlink::GenetlinkHandle;
-use netlink_packet_core::{NetlinkMessage, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST};
+use netlink_packet_core::{
+    NetlinkMessage, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST,
+};
 use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::DecodeError;
 
 use crate::{
-    try_ethtool,
-    EthtoolCoalesceHandle,
-    EthtoolError,
-    EthtoolFeatureHandle,
-    EthtoolLinkModeHandle,
-    EthtoolMessage,
-    EthtoolPauseHandle,
+    try_ethtool, EthtoolCoalesceHandle, EthtoolError, EthtoolFeatureHandle,
+    EthtoolLinkModeHandle, EthtoolMessage, EthtoolPauseHandle,
     EthtoolRingHandle,
 };
 
@@ -51,13 +48,20 @@ impl EthtoolHandle {
         &mut self,
         message: NetlinkMessage<GenlMessage<EthtoolMessage>>,
     ) -> Result<
-        impl Stream<Item = Result<NetlinkMessage<GenlMessage<EthtoolMessage>>, DecodeError>>,
+        impl Stream<
+            Item = Result<
+                NetlinkMessage<GenlMessage<EthtoolMessage>>,
+                DecodeError,
+            >,
+        >,
         EthtoolError,
     > {
-        self.handle
-            .request(message)
-            .await
-            .map_err(|e| EthtoolError::RequestFailed(format!("BUG: Request failed with {}", e)))
+        self.handle.request(message).await.map_err(|e| {
+            EthtoolError::RequestFailed(format!(
+                "BUG: Request failed with {}",
+                e
+            ))
+        })
     }
 }
 
@@ -78,14 +82,20 @@ pub(crate) async fn ethtool_execute(
         NLM_F_REQUEST
     };
 
-    let mut nl_msg = NetlinkMessage::from(GenlMessage::from_payload(ethtool_msg));
+    let mut nl_msg =
+        NetlinkMessage::from(GenlMessage::from_payload(ethtool_msg));
 
     nl_msg.header.flags = nl_header_flags;
 
     match handle.request(nl_msg).await {
-        Ok(response) => Either::Left(response.map(move |msg| Ok(try_ethtool!(msg)))),
+        Ok(response) => {
+            Either::Left(response.map(move |msg| Ok(try_ethtool!(msg))))
+        }
         Err(e) => Either::Right(
-            futures::future::err::<GenlMessage<EthtoolMessage>, EthtoolError>(e).into_stream(),
+            futures::future::err::<GenlMessage<EthtoolMessage>, EthtoolError>(
+                e,
+            )
+            .into_stream(),
         ),
     }
 }

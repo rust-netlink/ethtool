@@ -5,9 +5,7 @@ use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
     parsers::{parse_u32, parse_u8},
-    DecodeError,
-    Emitable,
-    Parseable,
+    DecodeError, Emitable, Parseable,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -117,7 +115,9 @@ impl Nla for EthtoolCoalesceAttr {
             Self::RxMaxFramesHigh(_) => ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH,
             Self::TxUsecsHigh(_) => ETHTOOL_A_COALESCE_TX_USECS_HIGH,
             Self::TxMaxFramesHigh(_) => ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH,
-            Self::RateSampleInterval(_) => ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL,
+            Self::RateSampleInterval(_) => {
+                ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL
+            }
             Self::Other(attr) => attr.kind(),
         }
     }
@@ -145,13 +145,19 @@ impl Nla for EthtoolCoalesceAttr {
             | Self::RxMaxFramesHigh(d)
             | Self::TxUsecsHigh(d)
             | Self::TxMaxFramesHigh(d)
-            | Self::RateSampleInterval(d) => NativeEndian::write_u32(buffer, *d),
-            Self::UseAdaptiveRx(d) | Self::UseAdaptiveTx(d) => buffer[0] = if *d { 1 } else { 0 },
+            | Self::RateSampleInterval(d) => {
+                NativeEndian::write_u32(buffer, *d)
+            }
+            Self::UseAdaptiveRx(d) | Self::UseAdaptiveTx(d) => {
+                buffer[0] = (*d).into()
+            }
         }
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolCoalesceAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolCoalesceAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -160,107 +166,146 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolCoalesc
                 let error_msg = "failed to parse coalesce header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolHeader::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolHeader::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
             }
             ETHTOOL_A_COALESCE_RX_USECS => Self::RxUsecs(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_USECS value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_RX_USECS value")?,
             ),
-            ETHTOOL_A_COALESCE_RX_MAX_FRAMES => Self::RxMaxFrames(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES value")?,
-            ),
+            ETHTOOL_A_COALESCE_RX_MAX_FRAMES => {
+                Self::RxMaxFrames(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES value",
+                )?)
+            }
 
             ETHTOOL_A_COALESCE_RX_USECS_IRQ => Self::RxUsecsIrq(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_USECS_IRQ value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_RX_USECS_IRQ value")?,
             ),
 
-            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_IRQ => Self::RxMaxFramesIrq(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_IRQ value")?,
-            ),
+            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_IRQ => {
+                Self::RxMaxFramesIrq(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_IRQ value",
+                )?)
+            }
 
             ETHTOOL_A_COALESCE_TX_USECS => Self::TxUsecs(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_USECS value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_TX_USECS value")?,
             ),
 
-            ETHTOOL_A_COALESCE_TX_MAX_FRAMES => Self::TxMaxFrames(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES value")?,
-            ),
+            ETHTOOL_A_COALESCE_TX_MAX_FRAMES => {
+                Self::TxMaxFrames(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES value",
+                )?)
+            }
 
             ETHTOOL_A_COALESCE_TX_USECS_IRQ => Self::TxUsecsIrq(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_USECS_IRQ value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_TX_USECS_IRQ value")?,
             ),
 
-            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_IRQ => Self::TxMaxFramesIrq(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_IRQ value")?,
-            ),
+            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_IRQ => {
+                Self::TxMaxFramesIrq(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_IRQ value",
+                )?)
+            }
 
-            ETHTOOL_A_COALESCE_STATS_BLOCK_USECS => Self::StatsBlockUsecs(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_STATS_BLOCK_USECS value")?,
-            ),
+            ETHTOOL_A_COALESCE_STATS_BLOCK_USECS => {
+                Self::StatsBlockUsecs(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_STATS_BLOCK_USECS value",
+                )?)
+            }
 
             ETHTOOL_A_COALESCE_USE_ADAPTIVE_RX => Self::UseAdaptiveRx(
-                parse_u8(payload).context("Invalid ETHTOOL_A_COALESCE_USE_ADAPTIVE_RX value")? == 1,
+                parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_USE_ADAPTIVE_RX value",
+                )? == 1,
             ),
 
             ETHTOOL_A_COALESCE_USE_ADAPTIVE_TX => Self::UseAdaptiveTx(
-                parse_u8(payload).context("Invalid ETHTOOL_A_COALESCE_USE_ADAPTIVE_TX value")? == 1,
+                parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_USE_ADAPTIVE_TX value",
+                )? == 1,
             ),
 
             ETHTOOL_A_COALESCE_PKT_RATE_LOW => Self::PktRateLow(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_PKT_RATE_LOW value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_PKT_RATE_LOW value")?,
             ),
 
             ETHTOOL_A_COALESCE_RX_USECS_LOW => Self::RxUsecsLow(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_USECS_LOW value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_RX_USECS_LOW value")?,
             ),
 
-            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_LOW => Self::RxMaxFramesLow(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_LOW value")?,
-            ),
+            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_LOW => {
+                Self::RxMaxFramesLow(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_LOW value",
+                )?)
+            }
 
             ETHTOOL_A_COALESCE_TX_USECS_LOW => Self::TxUsecsLow(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_USECS_LOW value")?,
-            ),
-
-            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_LOW => Self::TxMaxFramesLow(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_LOW value")?,
-            ),
-
-            ETHTOOL_A_COALESCE_PKT_RATE_HIGH => Self::PktRateHigh(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_PKT_RATE_HIGH value")?,
-            ),
-
-            ETHTOOL_A_COALESCE_RX_USECS_HIGH => Self::RxUsecsHigh(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_RX_USECS_HIGH value")?,
-            ),
-
-            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH => Self::RxMaxFramesHigh(
                 parse_u32(payload)
-                    .context("Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH value")?,
+                    .context("Invalid ETHTOOL_A_COALESCE_TX_USECS_LOW value")?,
             ),
 
-            ETHTOOL_A_COALESCE_TX_USECS_HIGH => Self::TxUsecsHigh(
-                parse_u32(payload).context("Invalid ETHTOOL_A_COALESCE_TX_USECS_HIGH value")?,
-            ),
+            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_LOW => {
+                Self::TxMaxFramesLow(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_LOW value",
+                )?)
+            }
 
-            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH => Self::TxMaxFramesHigh(
-                parse_u32(payload)
-                    .context("Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH value")?,
-            ),
+            ETHTOOL_A_COALESCE_PKT_RATE_HIGH => {
+                Self::PktRateHigh(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_PKT_RATE_HIGH value",
+                )?)
+            }
 
-            ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL => Self::RateSampleInterval(
-                parse_u32(payload)
-                    .context("Invalid ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL value")?,
-            ),
+            ETHTOOL_A_COALESCE_RX_USECS_HIGH => {
+                Self::RxUsecsHigh(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_USECS_HIGH value",
+                )?)
+            }
 
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH => {
+                Self::RxMaxFramesHigh(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_TX_USECS_HIGH => {
+                Self::TxUsecsHigh(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_USECS_HIGH value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH => {
+                Self::TxMaxFramesHigh(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL => {
+                Self::RateSampleInterval(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL value",
+                )?)
+            }
+
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
 
-pub(crate) fn parse_coalesce_nlas(buffer: &[u8]) -> Result<Vec<EthtoolAttr>, DecodeError> {
+pub(crate) fn parse_coalesce_nlas(
+    buffer: &[u8],
+) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(

@@ -5,9 +5,7 @@ use log::warn;
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
     parsers::{parse_string, parse_u32},
-    DecodeError,
-    Emitable,
-    Parseable,
+    DecodeError, Emitable, Parseable,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -68,7 +66,9 @@ impl Nla for EthtoolFeatureAttr {
             Self::Hw(feature_bits)
             | Self::Wanted(feature_bits)
             | Self::Active(feature_bits)
-            | Self::NoChange(feature_bits) => feature_bits_len(feature_bits.as_slice()),
+            | Self::NoChange(feature_bits) => {
+                feature_bits_len(feature_bits.as_slice())
+            }
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -90,13 +90,17 @@ impl Nla for EthtoolFeatureAttr {
             Self::Hw(feature_bits)
             | Self::Wanted(feature_bits)
             | Self::Active(feature_bits)
-            | Self::NoChange(feature_bits) => feature_bits_emit(feature_bits.as_slice(), buffer),
+            | Self::NoChange(feature_bits) => {
+                feature_bits_emit(feature_bits.as_slice(), buffer)
+            }
             Self::Other(ref attr) => attr.emit(buffer),
         }
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolFeatureAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolFeatureAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -105,32 +109,39 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolFeature
                 let error_msg = "failed to parse feature header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolHeader::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolHeader::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
             }
             ETHTOOL_A_FEATURES_HW => {
                 Self::Hw(parse_bitset_bits_nlas(
-                    payload, true, /* ETHTOOL_A_FEATURES_HW is using mask */
+                    payload,
+                    true, /* ETHTOOL_A_FEATURES_HW is using mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_WANTED => {
                 Self::Wanted(parse_bitset_bits_nlas(
-                    payload, false, /* ETHTOOL_A_FEATURES_WANTED does not use mask */
+                    payload,
+                    false, /* ETHTOOL_A_FEATURES_WANTED does not use mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_ACTIVE => {
                 Self::Active(parse_bitset_bits_nlas(
-                    payload, false, /* ETHTOOL_A_FEATURES_ACTIVE does not use mask */
+                    payload,
+                    false, /* ETHTOOL_A_FEATURES_ACTIVE does not use mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_NOCHANGE => {
                 Self::NoChange(parse_bitset_bits_nlas(
-                    payload, false, /* ETHTOOL_A_FEATURES_NOCHANGE does not use mask */
+                    payload,
+                    false, /* ETHTOOL_A_FEATURES_NOCHANGE does not use mask */
                 )?)
             }
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
@@ -159,7 +170,8 @@ fn parse_bitset_bits_nla(
         let bit_nla = &bit_nla.context(error_msg)?;
         match bit_nla.kind() {
             ETHTOOL_A_BITSET_BITS_BIT => {
-                let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
+                let error_msg =
+                    "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
                 let nlas = NlasIterator::new(bit_nla.value());
                 let mut cur_bit_info = EthtoolFeatureBit::new(has_mask);
                 for nla in nlas {
@@ -167,16 +179,20 @@ fn parse_bitset_bits_nla(
                     let payload = nla.value();
                     match nla.kind() {
                         ETHTOOL_A_BITSET_BIT_INDEX => {
-                            if cur_bit_info.index != 0 && !&cur_bit_info.name.is_empty() {
+                            if cur_bit_info.index != 0
+                                && !&cur_bit_info.name.is_empty()
+                            {
                                 feature_bits.push(cur_bit_info);
                                 cur_bit_info = EthtoolFeatureBit::new(has_mask);
                             }
-                            cur_bit_info.index = parse_u32(payload)
-                                .context("Invald ETHTOOL_A_BITSET_BIT_INDEX value")?;
+                            cur_bit_info.index = parse_u32(payload).context(
+                                "Invald ETHTOOL_A_BITSET_BIT_INDEX value",
+                            )?;
                         }
                         ETHTOOL_A_BITSET_BIT_NAME => {
-                            cur_bit_info.name = parse_string(payload)
-                                .context("Invald ETHTOOL_A_BITSET_BIT_NAME value")?;
+                            cur_bit_info.name = parse_string(payload).context(
+                                "Invald ETHTOOL_A_BITSET_BIT_NAME value",
+                            )?;
                         }
                         ETHTOOL_A_BITSET_BIT_VALUE => {
                             cur_bit_info.value = true;
@@ -206,7 +222,9 @@ fn parse_bitset_bits_nla(
     Ok(feature_bits)
 }
 
-pub(crate) fn parse_feature_nlas(buffer: &[u8]) -> Result<Vec<EthtoolAttr>, DecodeError> {
+pub(crate) fn parse_feature_nlas(
+    buffer: &[u8],
+) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(

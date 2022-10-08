@@ -7,7 +7,7 @@ edition = "2018"
 description = "Linux Ethtool Communication Library"
 keywords = ["network"]
 categories = ["network-programming", "os"]
-readme = "../README.md"
+readme = "README.md"
 
 [lib]
 name = "ethtool"
