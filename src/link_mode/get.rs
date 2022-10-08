@@ -20,13 +20,15 @@ impl EthtoolLinkModeGetRequest {
 
     pub async fn execute(
         self,
-    ) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError> {
+    ) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError>
+    {
         let EthtoolLinkModeGetRequest {
             mut handle,
             iface_name,
         } = self;
 
-        let ethtool_msg = EthtoolMessage::new_link_mode_get(iface_name.as_deref());
+        let ethtool_msg =
+            EthtoolMessage::new_link_mode_get(iface_name.as_deref());
         ethtool_execute(&mut handle, iface_name.is_none(), ethtool_msg).await
     }
 }

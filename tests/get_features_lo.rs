@@ -28,9 +28,11 @@ async fn get_feature(iface_name: Option<&str>) {
     assert!(ethtool_msg.nlas.len() > 1);
     assert!(
         ethtool_msg.nlas[0]
-            == ethtool::EthtoolAttr::Feature(ethtool::EthtoolFeatureAttr::Header(vec![
-                ethtool::EthtoolHeader::DevIndex(1),
-                ethtool::EthtoolHeader::DevName("lo".into())
-            ]))
+            == ethtool::EthtoolAttr::Feature(
+                ethtool::EthtoolFeatureAttr::Header(vec![
+                    ethtool::EthtoolHeader::DevIndex(1),
+                    ethtool::EthtoolHeader::DevName("lo".into())
+                ])
+            )
     );
 }

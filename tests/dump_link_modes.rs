@@ -3,7 +3,8 @@
 use futures::stream::TryStreamExt;
 
 #[test]
-// CI container normally have a veth for external communication which support link modes of ethtool.
+// CI container normally have a veth for external communication which support
+// link modes of ethtool.
 fn test_dump_link_modes() {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_io()

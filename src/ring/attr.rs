@@ -5,9 +5,7 @@ use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
     parsers::parse_u32,
-    DecodeError,
-    Emitable,
-    Parseable,
+    DecodeError, Emitable, Parseable,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -83,7 +81,9 @@ impl Nla for EthtoolRingAttr {
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolRingAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolRingAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -92,45 +92,59 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolRingAtt
                 let error_msg = "failed to parse ring header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolHeader::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolHeader::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
             }
-            ETHTOOL_A_RINGS_RX_MAX => {
-                Self::RxMax(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX_MAX value")?)
-            }
+            ETHTOOL_A_RINGS_RX_MAX => Self::RxMax(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX_MAX value")?,
+            ),
 
             ETHTOOL_A_RINGS_RX_MINI_MAX => Self::RxMiniMax(
-                parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX_MINI_MAX value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX_MINI_MAX value")?,
             ),
             ETHTOOL_A_RINGS_RX_JUMBO_MAX => Self::RxJumboMax(
-                parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX_JUMBO_MAX value")?,
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX_JUMBO_MAX value")?,
             ),
-            ETHTOOL_A_RINGS_TX_MAX => {
-                Self::TxMax(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_TX_MAX value")?)
-            }
-            ETHTOOL_A_RINGS_RX => {
-                Self::Rx(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX value")?)
-            }
-            ETHTOOL_A_RINGS_RX_MINI => {
-                Self::RxMini(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX_MINI value")?)
-            }
-            ETHTOOL_A_RINGS_RX_JUMBO => {
-                Self::RxJumbo(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_RX_JUMBO value")?)
-            }
-            ETHTOOL_A_RINGS_TX => {
-                Self::Tx(parse_u32(payload).context("Invalid ETHTOOL_A_RINGS_TX value")?)
-            }
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            ETHTOOL_A_RINGS_TX_MAX => Self::TxMax(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_TX_MAX value")?,
+            ),
+            ETHTOOL_A_RINGS_RX => Self::Rx(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX value")?,
+            ),
+            ETHTOOL_A_RINGS_RX_MINI => Self::RxMini(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX_MINI value")?,
+            ),
+            ETHTOOL_A_RINGS_RX_JUMBO => Self::RxJumbo(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_RX_JUMBO value")?,
+            ),
+            ETHTOOL_A_RINGS_TX => Self::Tx(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_RINGS_TX value")?,
+            ),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
 
-pub(crate) fn parse_ring_nlas(buffer: &[u8]) -> Result<Vec<EthtoolAttr>, DecodeError> {
+pub(crate) fn parse_ring_nlas(
+    buffer: &[u8],
+) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
-        let error_msg = format!("Failed to parse ethtool ring message attribute {:?}", nla);
+        let error_msg =
+            format!("Failed to parse ethtool ring message attribute {:?}", nla);
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolRingAttr::parse(nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Ring(parsed));

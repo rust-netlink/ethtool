@@ -16,7 +16,8 @@ async fn get_link_mode(iface_name: Option<&str>) {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
-    let mut link_mode_handle = handle.link_mode().get(iface_name).execute().await;
+    let mut link_mode_handle =
+        handle.link_mode().get(iface_name).execute().await;
 
     let mut msgs = Vec::new();
     while let Some(msg) = link_mode_handle.try_next().await.unwrap() {

@@ -5,9 +5,7 @@ use log::warn;
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
     parsers::{parse_string, parse_u32, parse_u8},
-    DecodeError,
-    Emitable,
-    Parseable,
+    DecodeError, Emitable, Parseable,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -94,8 +92,12 @@ impl Nla for EthtoolLinkModeAttr {
             Self::Peer(_) => ETHTOOL_A_LINKMODES_PEER,
             Self::Speed(_) => ETHTOOL_A_LINKMODES_SPEED,
             Self::Duplex(_) => ETHTOOL_A_LINKMODES_DUPLEX,
-            Self::ControllerSubordinateCfg(_) => ETHTOOL_A_LINKMODES_SUBORDINATE_CFG,
-            Self::ControllerSubordinateState(_) => ETHTOOL_A_LINKMODES_SUBORDINATE_STATE,
+            Self::ControllerSubordinateCfg(_) => {
+                ETHTOOL_A_LINKMODES_SUBORDINATE_CFG
+            }
+            Self::ControllerSubordinateState(_) => {
+                ETHTOOL_A_LINKMODES_SUBORDINATE_STATE
+            }
             Self::Lanes(_) => ETHTOOL_A_LINKMODES_LANES,
             Self::Other(attr) => attr.kind(),
         }
@@ -110,7 +112,9 @@ impl Nla for EthtoolLinkModeAttr {
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolLinkModeAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolLinkModeAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -119,35 +123,50 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolLinkMod
                 let error_msg = "failed to parse link_mode header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolHeader::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolHeader::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
             }
             ETHTOOL_A_LINKMODES_AUTONEG => Self::Autoneg(
-                parse_u8(payload).context("Invalid ETHTOOL_A_LINKMODES_AUTONEG value")? == 1,
+                parse_u8(payload)
+                    .context("Invalid ETHTOOL_A_LINKMODES_AUTONEG value")?
+                    == 1,
             ),
 
-            ETHTOOL_A_LINKMODES_OURS => Self::Ours(parse_bitset_bits_nlas(payload)?),
-            ETHTOOL_A_LINKMODES_PEER => Self::Peer(parse_bitset_bits_nlas(payload)?),
-            ETHTOOL_A_LINKMODES_SPEED => {
-                Self::Speed(parse_u32(payload).context("Invalid ETHTOOL_A_LINKMODES_SPEED value")?)
+            ETHTOOL_A_LINKMODES_OURS => {
+                Self::Ours(parse_bitset_bits_nlas(payload)?)
             }
+            ETHTOOL_A_LINKMODES_PEER => {
+                Self::Peer(parse_bitset_bits_nlas(payload)?)
+            }
+            ETHTOOL_A_LINKMODES_SPEED => Self::Speed(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_LINKMODES_SPEED value")?,
+            ),
             ETHTOOL_A_LINKMODES_DUPLEX => Self::Duplex(
                 parse_u8(payload)
                     .context("Invalid ETHTOOL_A_LINKMODES_DUPLEX value")?
                     .into(),
             ),
-            ETHTOOL_A_LINKMODES_SUBORDINATE_CFG => Self::ControllerSubordinateCfg(
-                parse_u8(payload).context("Invalid ETHTOOL_A_LINKMODES_SUBORDINATE_CFG value")?,
-            ),
-            ETHTOOL_A_LINKMODES_SUBORDINATE_STATE => Self::ControllerSubordinateState(
-                parse_u8(payload).context("Invalid ETHTOOL_A_LINKMODES_SUBORDINATE_STATE value")?,
-            ),
-            ETHTOOL_A_LINKMODES_LANES => {
-                Self::Lanes(parse_u32(payload).context("Invalid ETHTOOL_A_LINKMODES_LANES value")?)
+            ETHTOOL_A_LINKMODES_SUBORDINATE_CFG => {
+                Self::ControllerSubordinateCfg(parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_LINKMODES_SUBORDINATE_CFG value",
+                )?)
             }
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            ETHTOOL_A_LINKMODES_SUBORDINATE_STATE => {
+                Self::ControllerSubordinateState(parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_LINKMODES_SUBORDINATE_STATE value",
+                )?)
+            }
+            ETHTOOL_A_LINKMODES_LANES => Self::Lanes(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_LINKMODES_LANES value")?,
+            ),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
@@ -170,20 +189,21 @@ fn parse_bitset_bits_nla(raw: &[u8]) -> Result<Vec<String>, DecodeError> {
         let bit_nla = &bit_nla.context(error_msg)?;
         match bit_nla.kind() {
             ETHTOOL_A_BITSET_BITS_BIT => {
-                let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
+                let error_msg =
+                    "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
                 let nlas = NlasIterator::new(bit_nla.value());
                 for nla in nlas {
                     let nla = &nla.context(error_msg)?;
                     let payload = nla.value();
                     match nla.kind() {
-                        ETHTOOL_A_BITSET_BIT_INDEX | ETHTOOL_A_BITSET_BIT_VALUE => {
+                        ETHTOOL_A_BITSET_BIT_INDEX
+                        | ETHTOOL_A_BITSET_BIT_VALUE => {
                             // ignored
                         }
                         ETHTOOL_A_BITSET_BIT_NAME => {
-                            modes.push(
-                                parse_string(payload)
-                                    .context("Invald ETHTOOL_A_BITSET_BIT_NAME value")?,
-                            );
+                            modes.push(parse_string(payload).context(
+                                "Invald ETHTOOL_A_BITSET_BIT_NAME value",
+                            )?);
                         }
                         _ => {
                             warn!(
@@ -207,7 +227,9 @@ fn parse_bitset_bits_nla(raw: &[u8]) -> Result<Vec<String>, DecodeError> {
     Ok(modes)
 }
 
-pub(crate) fn parse_link_mode_nlas(buffer: &[u8]) -> Result<Vec<EthtoolAttr>, DecodeError> {
+pub(crate) fn parse_link_mode_nlas(
+    buffer: &[u8],
+) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(

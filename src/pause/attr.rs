@@ -5,9 +5,7 @@ use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_utils::{
     nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
     parsers::{parse_u64, parse_u8},
-    DecodeError,
-    Emitable,
-    Parseable,
+    DecodeError, Emitable, Parseable,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -46,23 +44,31 @@ impl Nla for EthtoolPauseStatAttr {
 
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
-            Self::Rx(value) | Self::Tx(value) => NativeEndian::write_u64(buffer, *value),
+            Self::Rx(value) | Self::Tx(value) => {
+                NativeEndian::write_u64(buffer, *value)
+            }
             Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolPauseStatAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolPauseStatAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_PAUSE_STAT_TX_FRAMES => Self::Tx(
-                parse_u64(payload).context("invalid ETHTOOL_A_PAUSE_STAT_TX_FRAMES value")?,
+                parse_u64(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_STAT_TX_FRAMES value")?,
             ),
             ETHTOOL_A_PAUSE_STAT_RX_FRAMES => Self::Rx(
-                parse_u64(payload).context("invalid ETHTOOL_A_PAUSE_STAT_RX_FRAMES value")?,
+                parse_u64(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_STAT_RX_FRAMES value")?,
             ),
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
@@ -101,14 +107,18 @@ impl Nla for EthtoolPauseAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::AutoNeg(value) | Self::Rx(value) | Self::Tx(value) => buffer[0] = *value as u8,
+            Self::AutoNeg(value) | Self::Rx(value) | Self::Tx(value) => {
+                buffer[0] = *value as u8
+            }
             Self::Stats(ref nlas) => nlas.as_slice().emit(buffer),
             Self::Other(ref attr) => attr.emit(buffer),
         }
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolPauseAttr {
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolPauseAttr
+{
     fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
@@ -117,39 +127,54 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for EthtoolPauseAt
                 let error_msg = "failed to parse pause header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolHeader::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolHeader::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
             }
             ETHTOOL_A_PAUSE_AUTONEG => Self::AutoNeg(
-                parse_u8(payload).context("invalid ETHTOOL_A_PAUSE_AUTONEG value")? == 1,
+                parse_u8(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_AUTONEG value")?
+                    == 1,
             ),
-            ETHTOOL_A_PAUSE_RX => {
-                Self::Rx(parse_u8(payload).context("invalid ETHTOOL_A_PAUSE_RX value")? == 1)
-            }
-            ETHTOOL_A_PAUSE_TX => {
-                Self::Tx(parse_u8(payload).context("invalid ETHTOOL_A_PAUSE_TX value")? == 1)
-            }
+            ETHTOOL_A_PAUSE_RX => Self::Rx(
+                parse_u8(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_RX value")?
+                    == 1,
+            ),
+            ETHTOOL_A_PAUSE_TX => Self::Tx(
+                parse_u8(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_TX value")?
+                    == 1,
+            ),
             ETHTOOL_A_PAUSE_STATS => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse pause stats attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolPauseStatAttr::parse(nla).context(error_msg)?;
+                    let parsed =
+                        EthtoolPauseStatAttr::parse(nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Stats(nlas)
             }
-            _ => Self::Other(DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
         })
     }
 }
 
-pub(crate) fn parse_pause_nlas(buffer: &[u8]) -> Result<Vec<EthtoolAttr>, DecodeError> {
+pub(crate) fn parse_pause_nlas(
+    buffer: &[u8],
+) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
-        let error_msg = format!("Failed to parse ethtool pause message attribute {:?}", nla);
+        let error_msg = format!(
+            "Failed to parse ethtool pause message attribute {:?}",
+            nla
+        );
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolPauseAttr::parse(nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Pause(parsed));

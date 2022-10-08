@@ -119,9 +119,11 @@ impl GenlFamily for EthtoolMessage {
 impl EthtoolMessage {
     pub fn new_pause_get(iface_name: Option<&str>) -> Self {
         let nlas = match iface_name {
-            Some(s) => vec![EthtoolAttr::Pause(EthtoolPauseAttr::Header(vec![
-                EthtoolHeader::DevName(s.to_string()),
-            ]))],
+            Some(s) => {
+                vec![EthtoolAttr::Pause(EthtoolPauseAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
             None => vec![EthtoolAttr::Pause(EthtoolPauseAttr::Header(vec![]))],
         };
         EthtoolMessage {
@@ -132,10 +134,14 @@ impl EthtoolMessage {
 
     pub fn new_feature_get(iface_name: Option<&str>) -> Self {
         let nlas = match iface_name {
-            Some(s) => vec![EthtoolAttr::Feature(EthtoolFeatureAttr::Header(vec![
-                EthtoolHeader::DevName(s.to_string()),
-            ]))],
-            None => vec![EthtoolAttr::Feature(EthtoolFeatureAttr::Header(vec![]))],
+            Some(s) => {
+                vec![EthtoolAttr::Feature(EthtoolFeatureAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::Feature(EthtoolFeatureAttr::Header(vec![]))]
+            }
         };
         EthtoolMessage {
             cmd: EthtoolCmd::FeatureGet,
@@ -145,10 +151,14 @@ impl EthtoolMessage {
 
     pub fn new_link_mode_get(iface_name: Option<&str>) -> Self {
         let nlas = match iface_name {
-            Some(s) => vec![EthtoolAttr::LinkMode(EthtoolLinkModeAttr::Header(vec![
-                EthtoolHeader::DevName(s.to_string()),
-            ]))],
-            None => vec![EthtoolAttr::LinkMode(EthtoolLinkModeAttr::Header(vec![]))],
+            Some(s) => {
+                vec![EthtoolAttr::LinkMode(EthtoolLinkModeAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::LinkMode(EthtoolLinkModeAttr::Header(vec![]))]
+            }
         };
         EthtoolMessage {
             cmd: EthtoolCmd::LinkModeGet,
@@ -171,10 +181,14 @@ impl EthtoolMessage {
 
     pub fn new_coalesce_get(iface_name: Option<&str>) -> Self {
         let nlas = match iface_name {
-            Some(s) => vec![EthtoolAttr::Coalesce(EthtoolCoalesceAttr::Header(vec![
-                EthtoolHeader::DevName(s.to_string()),
-            ]))],
-            None => vec![EthtoolAttr::Coalesce(EthtoolCoalesceAttr::Header(vec![]))],
+            Some(s) => {
+                vec![EthtoolAttr::Coalesce(EthtoolCoalesceAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::Coalesce(EthtoolCoalesceAttr::Header(vec![]))]
+            }
         };
         EthtoolMessage {
             cmd: EthtoolCmd::CoalesceGet,
@@ -194,7 +208,10 @@ impl Emitable for EthtoolMessage {
 }
 
 impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
-    fn parse_with_param(buffer: &[u8], header: GenlHeader) -> Result<Self, DecodeError> {
+    fn parse_with_param(
+        buffer: &[u8],
+        header: GenlHeader,
+    ) -> Result<Self, DecodeError> {
         Ok(match header.cmd {
             ETHTOOL_MSG_PAUSE_GET_REPLY => Self {
                 cmd: EthtoolCmd::PauseGetReply,
