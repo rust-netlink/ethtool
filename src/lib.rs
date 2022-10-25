@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+mod bitset_util;
 mod coalesce;
 mod connection;
 mod error;
@@ -11,6 +12,7 @@ mod macros;
 mod message;
 mod pause;
 mod ring;
+mod tsinfo;
 
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
@@ -35,5 +37,8 @@ pub use pause::{
     EthtoolPauseStatAttr,
 };
 pub use ring::{EthtoolRingAttr, EthtoolRingGetRequest, EthtoolRingHandle};
+pub use tsinfo::{
+    EthtoolTsInfoAttr, EthtoolTsInfoGetRequest, EthtoolTsInfoHandle,
+};
 
 pub(crate) use handle::ethtool_execute;
