@@ -309,8 +309,7 @@ pub(crate) fn parse_coalesce_nlas(
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(
-            "Failed to parse ethtool coalesce message attribute {:?}",
-            nla
+            "Failed to parse ethtool coalesce message attribute {nla:?}"
         );
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolCoalesceAttr::parse(nla).context(error_msg)?;

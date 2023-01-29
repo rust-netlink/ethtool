@@ -24,6 +24,6 @@ async fn get_coalesce(iface_name: Option<&str>) {
     }
     assert!(!msgs.is_empty());
     for msg in msgs {
-        println!("{:?}", msg);
+        println!("{msg:?}");
     }
 }

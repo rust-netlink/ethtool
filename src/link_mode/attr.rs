@@ -233,8 +233,7 @@ pub(crate) fn parse_link_mode_nlas(
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(
-            "Failed to parse ethtool link_mode message attribute {:?}",
-            nla
+            "Failed to parse ethtool link_mode message attribute {nla:?}"
         );
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolLinkModeAttr::parse(nla).context(error_msg)?;
