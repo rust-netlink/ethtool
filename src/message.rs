@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use netlink_packet_core::DecodeError;
 use netlink_packet_generic::{GenlFamily, GenlHeader};
-use netlink_packet_utils::{nla::Nla, Emitable, ParseableParametrized};
+use netlink_packet_utils::{
+    nla::Nla, DecodeError, Emitable, ParseableParametrized,
+};
 
 use crate::{
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
