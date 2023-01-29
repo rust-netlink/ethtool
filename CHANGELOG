@@ -1,0 +1,10 @@
+# Changelog
+## [0.2.4] - 2023-01-29
+### Breaking changes
+ - N/A
+
+### New features
+ - N/A
+
+### Bug fixes
+ - Use latest rust-netlink crates. (151f217)
