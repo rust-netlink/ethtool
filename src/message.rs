@@ -236,8 +236,7 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             },
             cmd => {
                 return Err(DecodeError::from(format!(
-                    "Unsupported ethtool reply command: {}",
-                    cmd
+                    "Unsupported ethtool reply command: {cmd}"
                 )))
             }
         })

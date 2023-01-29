@@ -168,12 +168,10 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     .context("Invalid ETHTOOL_A_RINGS_TX_PUSH value")?
                     > 0,
             ),
-            kind => {
-                Self::Other(DefaultNla::parse(buf).context(format!(
-                    "invalid ethtool ring NLA kind {}",
-                    kind
-                ))?)
-            }
+            kind => Self::Other(
+                DefaultNla::parse(buf)
+                    .context(format!("invalid ethtool ring NLA kind {kind}"))?,
+            ),
         })
     }
 }
@@ -184,7 +182,7 @@ pub(crate) fn parse_ring_nlas(
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg =
-            format!("Failed to parse ethtool ring message attribute {:?}", nla);
+            format!("Failed to parse ethtool ring message attribute {nla:?}");
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolRingAttr::parse(nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Ring(parsed));

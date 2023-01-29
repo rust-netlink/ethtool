@@ -171,10 +171,8 @@ pub(crate) fn parse_pause_nlas(
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
-        let error_msg = format!(
-            "Failed to parse ethtool pause message attribute {:?}",
-            nla
-        );
+        let error_msg =
+            format!("Failed to parse ethtool pause message attribute {nla:?}");
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolPauseAttr::parse(nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Pause(parsed));

@@ -24,5 +24,5 @@ async fn get_pause(iface_name: Option<&str>) {
         msgs.push(msg);
     }
     assert!(!msgs.is_empty());
-    println!("{:?}", msgs);
+    println!("{msgs:?}");
 }

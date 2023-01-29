@@ -228,8 +228,7 @@ pub(crate) fn parse_feature_nlas(
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
         let error_msg = format!(
-            "Failed to parse ethtool feature message attribute {:?}",
-            nla
+            "Failed to parse ethtool feature message attribute {nla:?}"
         );
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolFeatureAttr::parse(nla).context(error_msg)?;

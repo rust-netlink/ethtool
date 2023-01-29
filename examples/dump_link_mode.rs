@@ -25,6 +25,6 @@ async fn get_link_mode(iface_name: Option<&str>) {
     }
     assert!(!msgs.is_empty());
     for msg in msgs {
-        println!("{:?}", msg);
+        println!("{msg:?}");
     }
 }
