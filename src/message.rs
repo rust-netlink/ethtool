@@ -6,6 +6,7 @@ use netlink_packet_utils::{
 };
 
 use crate::{
+    channel::{parse_channel_nlas, EthtoolChannelAttr},
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
     link_mode::{parse_link_mode_nlas, EthtoolLinkModeAttr},
@@ -23,6 +24,8 @@ const ETHTOOL_MSG_LINKMODES_GET: u8 = 4;
 const ETHTOOL_MSG_LINKMODES_GET_REPLY: u8 = 4;
 const ETHTOOL_MSG_RINGS_GET: u8 = 15;
 const ETHTOOL_MSG_RINGS_GET_REPLY: u8 = 16;
+const ETHTOOL_MSG_CHANNELS_GET: u8 = 17;
+const ETHTOOL_MSG_CHANNELS_GET_REPLY: u8 = 18;
 const ETHTOOL_MSG_COALESCE_GET: u8 = 19;
 const ETHTOOL_MSG_COALESCE_GET_REPLY: u8 = 20;
 const ETHTOOL_MSG_TSINFO_GET: u8 = 25;
@@ -38,6 +41,8 @@ pub enum EthtoolCmd {
     LinkModeGetReply,
     RingGet,
     RingGetReply,
+    ChannelGet,
+    ChannelGetReply,
     CoalesceGet,
     CoalesceGetReply,
     TsInfoGet,
@@ -55,6 +60,8 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::LinkModeGetReply => ETHTOOL_MSG_LINKMODES_GET_REPLY,
             EthtoolCmd::RingGet => ETHTOOL_MSG_RINGS_GET,
             EthtoolCmd::RingGetReply => ETHTOOL_MSG_RINGS_GET_REPLY,
+            EthtoolCmd::ChannelGet => ETHTOOL_MSG_CHANNELS_GET,
+            EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
             EthtoolCmd::CoalesceGet => ETHTOOL_MSG_COALESCE_GET,
             EthtoolCmd::CoalesceGetReply => ETHTOOL_MSG_COALESCE_GET_REPLY,
             EthtoolCmd::TsInfoGet => ETHTOOL_MSG_TSINFO_GET,
@@ -69,6 +76,7 @@ pub enum EthtoolAttr {
     Feature(EthtoolFeatureAttr),
     LinkMode(EthtoolLinkModeAttr),
     Ring(EthtoolRingAttr),
+    Channel(EthtoolChannelAttr),
     Coalesce(EthtoolCoalesceAttr),
     TsInfo(EthtoolTsInfoAttr),
 }
@@ -80,6 +88,7 @@ impl Nla for EthtoolAttr {
             Self::Feature(attr) => attr.value_len(),
             Self::LinkMode(attr) => attr.value_len(),
             Self::Ring(attr) => attr.value_len(),
+            Self::Channel(attr) => attr.value_len(),
             Self::Coalesce(attr) => attr.value_len(),
             Self::TsInfo(attr) => attr.value_len(),
         }
@@ -91,6 +100,7 @@ impl Nla for EthtoolAttr {
             Self::Feature(attr) => attr.kind(),
             Self::LinkMode(attr) => attr.kind(),
             Self::Ring(attr) => attr.kind(),
+            Self::Channel(attr) => attr.kind(),
             Self::Coalesce(attr) => attr.kind(),
             Self::TsInfo(attr) => attr.kind(),
         }
@@ -102,6 +112,7 @@ impl Nla for EthtoolAttr {
             Self::Feature(attr) => attr.emit_value(buffer),
             Self::LinkMode(attr) => attr.emit_value(buffer),
             Self::Ring(attr) => attr.emit_value(buffer),
+            Self::Channel(attr) => attr.emit_value(buffer),
             Self::Coalesce(attr) => attr.emit_value(buffer),
             Self::TsInfo(attr) => attr.emit_value(buffer),
         }
@@ -191,6 +202,23 @@ impl EthtoolMessage {
         }
     }
 
+    pub fn new_channel_get(iface_name: Option<&str>) -> Self {
+        let nlas = match iface_name {
+            Some(s) => {
+                vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![]))]
+            }
+        };
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelGet,
+            nlas,
+        }
+    }
+
     pub fn new_coalesce_get(iface_name: Option<&str>) -> Self {
         let nlas = match iface_name {
             Some(s) => {
@@ -257,6 +285,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_RINGS_GET_REPLY => Self {
                 cmd: EthtoolCmd::RingGetReply,
                 nlas: parse_ring_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
+                cmd: EthtoolCmd::ChannelGetReply,
+                nlas: parse_channel_nlas(buffer)?,
             },
             ETHTOOL_MSG_COALESCE_GET_REPLY => Self {
                 cmd: EthtoolCmd::CoalesceGetReply,
