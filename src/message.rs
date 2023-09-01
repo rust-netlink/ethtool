@@ -12,6 +12,7 @@ use crate::{
     pause::{parse_pause_nlas, EthtoolPauseAttr},
     ring::{parse_ring_nlas, EthtoolRingAttr},
     tsinfo::{parse_tsinfo_nlas, EthtoolTsInfoAttr},
+    channel::{parse_channel_nlas, EthtoolChannelAttr},
     EthtoolHeader,
 };
 
@@ -27,6 +28,9 @@ const ETHTOOL_MSG_COALESCE_GET: u8 = 19;
 const ETHTOOL_MSG_COALESCE_GET_REPLY: u8 = 20;
 const ETHTOOL_MSG_TSINFO_GET: u8 = 25;
 const ETHTOOL_MSG_TSINFO_GET_REPLY: u8 = 26;
+const ETHTOOL_MSG_CHANNELS_GET: u8 = 17;
+const ETHTOOL_MSG_CHANNELS_GET_REPLY: u8 = 18;
+const ETHTOOL_MSG_CHANNELS_SET: u8 = 18;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolCmd {
@@ -42,6 +46,9 @@ pub enum EthtoolCmd {
     CoalesceGetReply,
     TsInfoGet,
     TsInfoGetReply,
+    ChannelGet,
+    ChannelGetReply,
+    ChannelSet,
 }
 
 impl From<EthtoolCmd> for u8 {
@@ -59,6 +66,9 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::CoalesceGetReply => ETHTOOL_MSG_COALESCE_GET_REPLY,
             EthtoolCmd::TsInfoGet => ETHTOOL_MSG_TSINFO_GET,
             EthtoolCmd::TsInfoGetReply => ETHTOOL_MSG_TSINFO_GET_REPLY,
+            EthtoolCmd::ChannelGet => ETHTOOL_MSG_CHANNELS_GET,
+            EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
+            EthtoolCmd::ChannelSet => ETHTOOL_MSG_CHANNELS_SET,
         }
     }
 }
@@ -71,6 +81,7 @@ pub enum EthtoolAttr {
     Ring(EthtoolRingAttr),
     Coalesce(EthtoolCoalesceAttr),
     TsInfo(EthtoolTsInfoAttr),
+    Channel(EthtoolChannelAttr)
 }
 
 impl Nla for EthtoolAttr {
@@ -82,6 +93,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.value_len(),
             Self::Coalesce(attr) => attr.value_len(),
             Self::TsInfo(attr) => attr.value_len(),
+            Self::Channel(attr) => attr.value_len(),
         }
     }
 
@@ -93,6 +105,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.kind(),
             Self::Coalesce(attr) => attr.kind(),
             Self::TsInfo(attr) => attr.kind(),
+            Self::Channel(attr) => attr.kind(),
         }
     }
 
@@ -104,6 +117,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.emit_value(buffer),
             Self::Coalesce(attr) => attr.emit_value(buffer),
             Self::TsInfo(attr) => attr.emit_value(buffer),
+            Self::Channel(attr) => attr.emit_value(buffer),
         }
     }
 }
@@ -224,6 +238,29 @@ impl EthtoolMessage {
             nlas,
         }
     }
+
+    pub fn new_channel_get(iface_name: Option<&str>) -> Self {
+        let nlas = match iface_name {
+            Some(s) => vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                EthtoolHeader::DevName(s.to_string()),
+            ]))],
+            None => vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![]))],
+        };
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelGet,
+            nlas,
+        }
+    }
+
+    pub fn new_channel_set(iface_name: &str) -> Self {
+        let nlas = vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+            EthtoolHeader::DevName(iface_name.to_string()),
+        ]))];
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelSet,
+            nlas,
+        }
+    }
 }
 
 impl Emitable for EthtoolMessage {
@@ -265,6 +302,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_TSINFO_GET_REPLY => Self {
                 cmd: EthtoolCmd::TsInfoGetReply,
                 nlas: parse_tsinfo_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
+                cmd: EthtoolCmd::ChannelGetReply,
+                nlas: parse_channel_nlas(buffer)?,
             },
             cmd => {
                 return Err(DecodeError::from(format!(
