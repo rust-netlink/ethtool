@@ -13,6 +13,7 @@ mod message;
 mod pause;
 mod ring;
 mod tsinfo;
+mod channel;
 
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
@@ -39,6 +40,10 @@ pub use pause::{
 pub use ring::{EthtoolRingAttr, EthtoolRingGetRequest, EthtoolRingHandle};
 pub use tsinfo::{
     EthtoolTsInfoAttr, EthtoolTsInfoGetRequest, EthtoolTsInfoHandle,
+};
+pub use channel::{
+    EthtoolChannelAttr, EthtoolChannelGetRequest, EthtoolChannelHandle,
+    EthtoolChannelSetRequest,
 };
 
 pub(crate) use handle::ethtool_execute;
