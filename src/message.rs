@@ -6,6 +6,7 @@ use netlink_packet_utils::{
 };
 
 use crate::{
+    channel::{parse_channel_nlas, EthtoolChannelAttr},
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
     fec::{parse_fec_nlas, EthtoolFecAttr},
@@ -30,6 +31,9 @@ const ETHTOOL_MSG_TSINFO_GET: u8 = 25;
 const ETHTOOL_MSG_TSINFO_GET_REPLY: u8 = 26;
 const ETHTOOL_MSG_FEC_GET: u8 = 29;
 const ETHTOOL_MSG_FEC_GET_REPLY: u8 = 30;
+const ETHTOOL_MSG_CHANNELS_GET: u8 = 17;
+const ETHTOOL_MSG_CHANNELS_GET_REPLY: u8 = 18;
+const ETHTOOL_MSG_CHANNELS_SET: u8 = 18;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolCmd {
@@ -47,6 +51,9 @@ pub enum EthtoolCmd {
     TsInfoGetReply,
     FecGet,
     FecGetReply,
+    ChannelGet,
+    ChannelGetReply,
+    ChannelSet,
 }
 
 impl From<EthtoolCmd> for u8 {
@@ -66,6 +73,9 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::TsInfoGetReply => ETHTOOL_MSG_TSINFO_GET_REPLY,
             EthtoolCmd::FecGet => ETHTOOL_MSG_FEC_GET,
             EthtoolCmd::FecGetReply => ETHTOOL_MSG_FEC_GET_REPLY,
+            EthtoolCmd::ChannelGet => ETHTOOL_MSG_CHANNELS_GET,
+            EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
+            EthtoolCmd::ChannelSet => ETHTOOL_MSG_CHANNELS_SET,
         }
     }
 }
@@ -79,6 +89,7 @@ pub enum EthtoolAttr {
     Coalesce(EthtoolCoalesceAttr),
     TsInfo(EthtoolTsInfoAttr),
     Fec(EthtoolFecAttr),
+    Channel(EthtoolChannelAttr),
 }
 
 impl Nla for EthtoolAttr {
@@ -91,6 +102,7 @@ impl Nla for EthtoolAttr {
             Self::Coalesce(attr) => attr.value_len(),
             Self::TsInfo(attr) => attr.value_len(),
             Self::Fec(attr) => attr.value_len(),
+            Self::Channel(attr) => attr.value_len(),
         }
     }
 
@@ -103,6 +115,7 @@ impl Nla for EthtoolAttr {
             Self::Coalesce(attr) => attr.kind(),
             Self::TsInfo(attr) => attr.kind(),
             Self::Fec(attr) => attr.kind(),
+            Self::Channel(attr) => attr.kind(),
         }
     }
 
@@ -115,6 +128,7 @@ impl Nla for EthtoolAttr {
             Self::Coalesce(attr) => attr.emit_value(buffer),
             Self::TsInfo(attr) => attr.emit_value(buffer),
             Self::Fec(attr) => attr.emit_value(buffer),
+            Self::Channel(attr) => attr.emit_value(buffer),
         }
     }
 }
@@ -252,6 +266,34 @@ impl EthtoolMessage {
             nlas,
         }
     }
+
+    pub fn new_channel_get(iface_name: Option<&str>) -> Self {
+        let nlas = match iface_name {
+            Some(s) => {
+                vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![]))]
+            }
+        };
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelGet,
+            nlas,
+        }
+    }
+
+    pub fn new_channel_set(iface_name: &str) -> Self {
+        let nlas =
+            vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                EthtoolHeader::DevName(iface_name.to_string()),
+            ]))];
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelSet,
+            nlas,
+        }
+    }
 }
 
 impl Emitable for EthtoolMessage {
@@ -297,6 +339,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_FEC_GET_REPLY => Self {
                 cmd: EthtoolCmd::FecGetReply,
                 nlas: parse_fec_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
+                cmd: EthtoolCmd::ChannelGetReply,
+                nlas: parse_channel_nlas(buffer)?,
             },
             cmd => {
                 return Err(DecodeError::from(format!(
