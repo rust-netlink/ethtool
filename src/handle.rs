@@ -9,9 +9,9 @@ use netlink_packet_generic::GenlMessage;
 use netlink_packet_utils::DecodeError;
 
 use crate::{
-    try_ethtool, EthtoolCoalesceHandle, EthtoolError, EthtoolFeatureHandle,
-    EthtoolLinkModeHandle, EthtoolMessage, EthtoolPauseHandle,
-    EthtoolRingHandle, EthtoolTsInfoHandle, EthtoolChannelHandle
+    try_ethtool, EthtoolChannelHandle, EthtoolCoalesceHandle, EthtoolError,
+    EthtoolFeatureHandle, EthtoolLinkModeHandle, EthtoolMessage,
+    EthtoolPauseHandle, EthtoolRingHandle, EthtoolTsInfoHandle,
 };
 
 #[derive(Clone, Debug)]

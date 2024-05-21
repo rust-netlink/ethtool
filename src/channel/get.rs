@@ -27,7 +27,8 @@ impl EthtoolChannelGetRequest {
             iface_name,
         } = self;
 
-        let ethtool_msg = EthtoolMessage::new_channel_get(iface_name.as_deref());
+        let ethtool_msg =
+            EthtoolMessage::new_channel_get(iface_name.as_deref());
         ethtool_execute(&mut handle, iface_name.is_none(), ethtool_msg).await
     }
 }

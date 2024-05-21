@@ -130,10 +130,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u32(payload)
                     .context("Invalid ETHTOOL_A_CHANNELS_RX_COUNT value")?,
             ),
-            kind => Self::Other(
-                DefaultNla::parse(buf)
-                    .context(format!("invalid ethtool channel NLA kind {kind}"))?,
-            ),
+            kind => {
+                Self::Other(DefaultNla::parse(buf).context(format!(
+                    "invalid ethtool channel NLA kind {kind}"
+                ))?)
+            }
         })
     }
 }
@@ -143,8 +144,9 @@ pub(crate) fn parse_channel_nlas(
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
     for nla in NlasIterator::new(buffer) {
-        let error_msg =
-            format!("Failed to parse ethtool channel message attribute {nla:?}");
+        let error_msg = format!(
+            "Failed to parse ethtool channel message attribute {nla:?}"
+        );
         let nla = &nla.context(error_msg.clone())?;
         let parsed = EthtoolChannelAttr::parse(nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Channel(parsed));

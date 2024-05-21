@@ -3,11 +3,18 @@
 use futures::TryStream;
 use netlink_packet_generic::GenlMessage;
 
-use crate::{ethtool_execute, EthtoolAttr, EthtoolError, EthtoolHandle, EthtoolMessage, EthtoolChannelAttr};
+use crate::{
+    ethtool_execute, EthtoolAttr, EthtoolChannelAttr, EthtoolError,
+    EthtoolHandle, EthtoolMessage,
+};
 
 pub struct EthtoolChannelSetRequest {
     handle: EthtoolHandle,
     message: EthtoolMessage,
+    rx_count: Option<u32>,
+    tx_count: Option<u32>,
+    other_count: Option<u32>,
+    combined_count: Option<u32>,
 }
 
 impl EthtoolChannelSetRequest {
@@ -15,26 +22,30 @@ impl EthtoolChannelSetRequest {
         EthtoolChannelSetRequest {
             handle,
             message: EthtoolMessage::new_channel_set(iface_name),
+            rx_count: None,
+            tx_count: None,
+            other_count: None,
+            combined_count: None,
         }
     }
 
     pub fn rx_count(mut self, count: u32) -> Self {
-        self.message.nlas.push(EthtoolAttr::Channel(EthtoolChannelAttr::RxCount(count)));
+        self.rx_count = Some(count);
         self
     }
 
     pub fn tx_count(mut self, count: u32) -> Self {
-        self.message.nlas.push(EthtoolAttr::Channel(EthtoolChannelAttr::TxCount(count)));
+        self.tx_count = Some(count);
         self
     }
 
     pub fn other_count(mut self, count: u32) -> Self {
-        self.message.nlas.push(EthtoolAttr::Channel(EthtoolChannelAttr::OtherCount(count)));
+        self.other_count = Some(count);
         self
     }
 
     pub fn combined_count(mut self, count: u32) -> Self {
-        self.message.nlas.push(EthtoolAttr::Channel(EthtoolChannelAttr::CombinedCount(count)));
+        self.combined_count = Some(count);
         self
     }
 
@@ -44,8 +55,33 @@ impl EthtoolChannelSetRequest {
     {
         let EthtoolChannelSetRequest {
             mut handle,
-            message,
+            mut message,
+            rx_count,
+            tx_count,
+            other_count,
+            combined_count,
         } = self;
+
+        if let Some(count) = rx_count {
+            message
+                .nlas
+                .push(EthtoolAttr::Channel(EthtoolChannelAttr::RxCount(count)));
+        }
+        if let Some(count) = tx_count {
+            message
+                .nlas
+                .push(EthtoolAttr::Channel(EthtoolChannelAttr::TxCount(count)));
+        }
+        if let Some(count) = other_count {
+            message.nlas.push(EthtoolAttr::Channel(
+                EthtoolChannelAttr::OtherCount(count),
+            ));
+        }
+        if let Some(count) = combined_count {
+            message.nlas.push(EthtoolAttr::Channel(
+                EthtoolChannelAttr::CombinedCount(count),
+            ));
+        }
 
         ethtool_execute(&mut handle, false, message).await
     }

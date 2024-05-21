@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use crate::{EthtoolHandle, EthtoolChannelGetRequest, EthtoolChannelSetRequest};
+use crate::{
+    EthtoolChannelGetRequest, EthtoolChannelSetRequest, EthtoolHandle,
+};
 
 pub struct EthtoolChannelHandle(EthtoolHandle);
 
@@ -11,7 +13,10 @@ impl EthtoolChannelHandle {
 
     /// Retrieve the ethtool Channels of a interface (equivalent to `ethtool -l
     /// eth1`)
-    pub fn get(&mut self, iface_name: Option<&str>) -> EthtoolChannelGetRequest {
+    pub fn get(
+        &mut self,
+        iface_name: Option<&str>,
+    ) -> EthtoolChannelGetRequest {
         EthtoolChannelGetRequest::new(self.0.clone(), iface_name)
     }
 
