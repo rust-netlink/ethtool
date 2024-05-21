@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 mod bitset_util;
+mod channel;
 mod coalesce;
 mod connection;
 mod error;
@@ -14,6 +15,10 @@ mod pause;
 mod ring;
 mod tsinfo;
 
+pub use channel::{
+    EthtoolChannelAttr, EthtoolChannelGetRequest, EthtoolChannelHandle,
+    EthtoolChannelSetRequest,
+};
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
 };
