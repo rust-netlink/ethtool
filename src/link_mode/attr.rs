@@ -7,7 +7,9 @@ use netlink_packet_utils::{
     DecodeError, Emitable, Parseable,
 };
 
-use crate::{bitset_util::parse_bitset_bits_nlas, EthtoolAttr, EthtoolHeader};
+use crate::{
+    bitset_util::parse_bitset_bits_string_nlas, EthtoolAttr, EthtoolHeader,
+};
 
 const ETHTOOL_A_LINKMODES_HEADER: u16 = 1;
 const ETHTOOL_A_LINKMODES_AUTONEG: u16 = 2;
@@ -127,10 +129,10 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             ),
 
             ETHTOOL_A_LINKMODES_OURS => {
-                Self::Ours(parse_bitset_bits_nlas(payload)?)
+                Self::Ours(parse_bitset_bits_string_nlas(payload)?)
             }
             ETHTOOL_A_LINKMODES_PEER => {
-                Self::Peer(parse_bitset_bits_nlas(payload)?)
+                Self::Peer(parse_bitset_bits_string_nlas(payload)?)
             }
             ETHTOOL_A_LINKMODES_SPEED => Self::Speed(
                 parse_u32(payload)

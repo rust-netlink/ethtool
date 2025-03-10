@@ -8,6 +8,7 @@ use netlink_packet_utils::{
 use crate::{
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
+    fec::{parse_fec_nlas, EthtoolFecAttr},
     link_mode::{parse_link_mode_nlas, EthtoolLinkModeAttr},
     pause::{parse_pause_nlas, EthtoolPauseAttr},
     ring::{parse_ring_nlas, EthtoolRingAttr},
@@ -27,6 +28,8 @@ const ETHTOOL_MSG_COALESCE_GET: u8 = 19;
 const ETHTOOL_MSG_COALESCE_GET_REPLY: u8 = 20;
 const ETHTOOL_MSG_TSINFO_GET: u8 = 25;
 const ETHTOOL_MSG_TSINFO_GET_REPLY: u8 = 26;
+const ETHTOOL_MSG_FEC_GET: u8 = 29;
+const ETHTOOL_MSG_FEC_GET_REPLY: u8 = 30;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolCmd {
@@ -42,6 +45,8 @@ pub enum EthtoolCmd {
     CoalesceGetReply,
     TsInfoGet,
     TsInfoGetReply,
+    FecGet,
+    FecGetReply,
 }
 
 impl From<EthtoolCmd> for u8 {
@@ -59,6 +64,8 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::CoalesceGetReply => ETHTOOL_MSG_COALESCE_GET_REPLY,
             EthtoolCmd::TsInfoGet => ETHTOOL_MSG_TSINFO_GET,
             EthtoolCmd::TsInfoGetReply => ETHTOOL_MSG_TSINFO_GET_REPLY,
+            EthtoolCmd::FecGet => ETHTOOL_MSG_FEC_GET,
+            EthtoolCmd::FecGetReply => ETHTOOL_MSG_FEC_GET_REPLY,
         }
     }
 }
@@ -71,6 +78,7 @@ pub enum EthtoolAttr {
     Ring(EthtoolRingAttr),
     Coalesce(EthtoolCoalesceAttr),
     TsInfo(EthtoolTsInfoAttr),
+    Fec(EthtoolFecAttr),
 }
 
 impl Nla for EthtoolAttr {
@@ -82,6 +90,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.value_len(),
             Self::Coalesce(attr) => attr.value_len(),
             Self::TsInfo(attr) => attr.value_len(),
+            Self::Fec(attr) => attr.value_len(),
         }
     }
 
@@ -93,6 +102,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.kind(),
             Self::Coalesce(attr) => attr.kind(),
             Self::TsInfo(attr) => attr.kind(),
+            Self::Fec(attr) => attr.kind(),
         }
     }
 
@@ -104,6 +114,7 @@ impl Nla for EthtoolAttr {
             Self::Ring(attr) => attr.emit_value(buffer),
             Self::Coalesce(attr) => attr.emit_value(buffer),
             Self::TsInfo(attr) => attr.emit_value(buffer),
+            Self::Fec(attr) => attr.emit_value(buffer),
         }
     }
 }
@@ -224,6 +235,23 @@ impl EthtoolMessage {
             nlas,
         }
     }
+
+    pub fn new_fec_get(iface_name: Option<&str>) -> Self {
+        let nlas = match iface_name {
+            Some(s) => {
+                vec![EthtoolAttr::Fec(EthtoolFecAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::Fec(EthtoolFecAttr::Header(vec![]))]
+            }
+        };
+        EthtoolMessage {
+            cmd: EthtoolCmd::FecGet,
+            nlas,
+        }
+    }
 }
 
 impl Emitable for EthtoolMessage {
@@ -265,6 +293,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_TSINFO_GET_REPLY => Self {
                 cmd: EthtoolCmd::TsInfoGetReply,
                 nlas: parse_tsinfo_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_FEC_GET_REPLY => Self {
+                cmd: EthtoolCmd::FecGetReply,
+                nlas: parse_fec_nlas(buffer)?,
             },
             cmd => {
                 return Err(DecodeError::from(format!(

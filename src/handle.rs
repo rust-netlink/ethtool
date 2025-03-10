@@ -10,8 +10,8 @@ use netlink_packet_utils::DecodeError;
 
 use crate::{
     try_ethtool, EthtoolCoalesceHandle, EthtoolError, EthtoolFeatureHandle,
-    EthtoolLinkModeHandle, EthtoolMessage, EthtoolPauseHandle,
-    EthtoolRingHandle, EthtoolTsInfoHandle,
+    EthtoolFecHandle, EthtoolLinkModeHandle, EthtoolMessage,
+    EthtoolPauseHandle, EthtoolRingHandle, EthtoolTsInfoHandle,
 };
 
 #[derive(Clone, Debug)]
@@ -48,6 +48,10 @@ impl EthtoolHandle {
         EthtoolTsInfoHandle::new(self.clone())
     }
 
+    pub fn fec(&mut self) -> EthtoolFecHandle {
+        EthtoolFecHandle::new(self.clone())
+    }
+
     pub async fn request(
         &mut self,
         message: NetlinkMessage<GenlMessage<EthtoolMessage>>,
@@ -60,6 +64,7 @@ impl EthtoolHandle {
         >,
         EthtoolError,
     > {
+        println!("HAHA {:?}", message);
         self.handle.request(message).await.map_err(|e| {
             EthtoolError::RequestFailed(format!("BUG: Request failed with {e}"))
         })

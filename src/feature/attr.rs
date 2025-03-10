@@ -116,25 +116,25 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 Self::Header(nlas)
             }
             ETHTOOL_A_FEATURES_HW => {
-                Self::Hw(parse_bitset_bits_nlas(
+                Self::Hw(parse_bitset_bits_string_nlas(
                     payload,
                     true, /* ETHTOOL_A_FEATURES_HW is using mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_WANTED => {
-                Self::Wanted(parse_bitset_bits_nlas(
+                Self::Wanted(parse_bitset_bits_string_nlas(
                     payload,
                     false, /* ETHTOOL_A_FEATURES_WANTED does not use mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_ACTIVE => {
-                Self::Active(parse_bitset_bits_nlas(
+                Self::Active(parse_bitset_bits_string_nlas(
                     payload,
                     false, /* ETHTOOL_A_FEATURES_ACTIVE does not use mask */
                 )?)
             }
             ETHTOOL_A_FEATURES_NOCHANGE => {
-                Self::NoChange(parse_bitset_bits_nlas(
+                Self::NoChange(parse_bitset_bits_string_nlas(
                     payload,
                     false, /* ETHTOOL_A_FEATURES_NOCHANGE does not use mask */
                 )?)
@@ -146,7 +146,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
     }
 }
 
-fn parse_bitset_bits_nlas(
+fn parse_bitset_bits_string_nlas(
     raw: &[u8],
     has_mask: bool,
 ) -> Result<Vec<EthtoolFeatureBit>, DecodeError> {
