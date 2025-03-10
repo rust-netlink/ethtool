@@ -7,7 +7,9 @@ use netlink_packet_utils::{
     DecodeError, Emitable, Parseable,
 };
 
-use crate::{bitset_util::parse_bitset_bits_nlas, EthtoolAttr, EthtoolHeader};
+use crate::{
+    bitset_util::parse_bitset_bits_string_nlas, EthtoolAttr, EthtoolHeader,
+};
 
 const ETHTOOL_A_TSINFO_HEADER: u16 = 1;
 const ETHTOOL_A_TSINFO_TIMESTAMPING: u16 = 2;
@@ -75,15 +77,15 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 Self::Header(nlas)
             }
             ETHTOOL_A_TSINFO_TIMESTAMPING => Self::Timestamping(
-                parse_bitset_bits_nlas(payload)
+                parse_bitset_bits_string_nlas(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_TIMESTAMPING value")?,
             ),
             ETHTOOL_A_TSINFO_TX_TYPES => Self::TxTypes(
-                parse_bitset_bits_nlas(payload)
+                parse_bitset_bits_string_nlas(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_TX_TYPES value")?,
             ),
             ETHTOOL_A_TSINFO_RX_FILTERS => Self::RxFilters(
-                parse_bitset_bits_nlas(payload)
+                parse_bitset_bits_string_nlas(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_RX_FILTERS value")?,
             ),
             ETHTOOL_A_TSINFO_PHC_INDEX => Self::PhcIndex(

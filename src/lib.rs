@@ -5,6 +5,7 @@ mod coalesce;
 mod connection;
 mod error;
 mod feature;
+mod fec;
 mod handle;
 mod header;
 mod link_mode;
@@ -14,6 +15,7 @@ mod pause;
 mod ring;
 mod tsinfo;
 
+pub use self::fec::{EthtoolFecAttr, EthtoolFecGetRequest, EthtoolFecHandle};
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
 };
