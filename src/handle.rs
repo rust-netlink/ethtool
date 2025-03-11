@@ -64,7 +64,6 @@ impl EthtoolHandle {
         >,
         EthtoolError,
     > {
-        println!("HAHA {:?}", message);
         self.handle.request(message).await.map_err(|e| {
             EthtoolError::RequestFailed(format!("BUG: Request failed with {e}"))
         })
