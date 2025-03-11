@@ -141,8 +141,9 @@ pub(crate) fn parse_fec_nlas(
     Ok(nlas)
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum EthtoolFecMode {
+    #[default]
     None,
     Rs,
     Baser,
@@ -187,6 +188,18 @@ impl From<u32> for EthtoolFecMode {
             ETHTOOL_LINK_MODE_FEC_BASER_BIT => Self::Baser,
             ETHTOOL_LINK_MODE_FEC_LLRS_BIT => Self::Llrs,
             _ => Self::Other(d, String::new()),
+        }
+    }
+}
+
+impl From<EthtoolFecMode> for u32 {
+    fn from(v: EthtoolFecMode) -> u32 {
+        match v {
+            EthtoolFecMode::None => ETHTOOL_LINK_MODE_FEC_NONE_BIT,
+            EthtoolFecMode::Rs => ETHTOOL_LINK_MODE_FEC_RS_BIT,
+            EthtoolFecMode::Baser => ETHTOOL_LINK_MODE_FEC_BASER_BIT,
+            EthtoolFecMode::Llrs => ETHTOOL_LINK_MODE_FEC_LLRS_BIT,
+            EthtoolFecMode::Other(d, _) => d,
         }
     }
 }
