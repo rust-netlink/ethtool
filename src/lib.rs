@@ -15,7 +15,10 @@ mod pause;
 mod ring;
 mod tsinfo;
 
-pub use self::fec::{EthtoolFecAttr, EthtoolFecGetRequest, EthtoolFecHandle};
+pub use self::fec::{
+    EthtoolFecAttr, EthtoolFecGetRequest, EthtoolFecHandle, EthtoolFecMode,
+    EthtoolFecStat,
+};
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
 };
