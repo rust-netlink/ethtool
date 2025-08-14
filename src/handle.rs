@@ -9,9 +9,9 @@ use netlink_packet_core::{
 use netlink_packet_generic::GenlMessage;
 
 use crate::{
-    try_ethtool, EthtoolChannelHandle, EthtoolCoalesceHandle, EthtoolError,
-    EthtoolFeatureHandle, EthtoolFecHandle, EthtoolLinkModeHandle,
-    EthtoolMessage, EthtoolPauseHandle, EthtoolRingHandle, EthtoolTsInfoHandle,
+    try_ethtool, EthtoolChannelHandle, EthtoolCoalesceHandle, EthtoolError, EthtoolFeatureHandle,
+    EthtoolFecHandle, EthtoolLinkModeHandle, EthtoolMessage, EthtoolPauseHandle, EthtoolRingHandle,
+    EthtoolTsInfoHandle, EthtoolModuleEEPROMHandle
 };
 
 #[derive(Clone, Debug)]
@@ -54,6 +54,10 @@ impl EthtoolHandle {
 
     pub fn channel(&mut self) -> EthtoolChannelHandle {
         EthtoolChannelHandle::new(self.clone())
+    }
+
+    pub fn eeprom(&mut self) -> EthtoolModuleEEPROMHandle {
+        EthtoolModuleEEPROMHandle::new(self.clone())
     }
 
     pub async fn request(
