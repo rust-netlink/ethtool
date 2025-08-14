@@ -8,6 +8,7 @@ use crate::{
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
     fec::{parse_fec_nlas, EthtoolFecAttr},
+    eeprom::{parse_module_eeprom_nlas, EthtoolModuleEEPROMAttr},
     link_mode::{parse_link_mode_nlas, EthtoolLinkModeAttr},
     pause::{parse_pause_nlas, EthtoolPauseAttr},
     ring::{parse_ring_nlas, EthtoolRingAttr},
@@ -32,6 +33,8 @@ const ETHTOOL_MSG_FEC_GET_REPLY: u8 = 30;
 const ETHTOOL_MSG_CHANNELS_GET: u8 = 17;
 const ETHTOOL_MSG_CHANNELS_GET_REPLY: u8 = 18;
 const ETHTOOL_MSG_CHANNELS_SET: u8 = 18;
+const ETHTOOL_MSG_MODULE_EEPROM_GET: u8 = 31;
+const ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY: u8 = 32;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolCmd {
@@ -52,6 +55,8 @@ pub enum EthtoolCmd {
     ChannelGet,
     ChannelGetReply,
     ChannelSet,
+    ModuleEEPROMGet,
+    ModuleEEPROMGetReply,
 }
 
 impl From<EthtoolCmd> for u8 {
@@ -74,6 +79,8 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::ChannelGet => ETHTOOL_MSG_CHANNELS_GET,
             EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
             EthtoolCmd::ChannelSet => ETHTOOL_MSG_CHANNELS_SET,
+            EthtoolCmd::ModuleEEPROMGet => ETHTOOL_MSG_MODULE_EEPROM_GET,
+            EthtoolCmd::ModuleEEPROMGetReply => ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY,
         }
     }
 }
@@ -88,6 +95,7 @@ pub enum EthtoolAttr {
     TsInfo(EthtoolTsInfoAttr),
     Fec(EthtoolFecAttr),
     Channel(EthtoolChannelAttr),
+    ModuleEEPROM(EthtoolModuleEEPROMAttr),
 }
 
 impl Nla for EthtoolAttr {
@@ -101,6 +109,7 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.value_len(),
             Self::Fec(attr) => attr.value_len(),
             Self::Channel(attr) => attr.value_len(),
+            Self::ModuleEEPROM(attr) => attr.value_len(),
         }
     }
 
@@ -114,6 +123,7 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.kind(),
             Self::Fec(attr) => attr.kind(),
             Self::Channel(attr) => attr.kind(),
+            Self::ModuleEEPROM(attr) => attr.kind(),
         }
     }
 
@@ -127,6 +137,7 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.emit_value(buffer),
             Self::Fec(attr) => attr.emit_value(buffer),
             Self::Channel(attr) => attr.emit_value(buffer),
+            Self::ModuleEEPROM(attr) => attr.emit_value(buffer),
         }
     }
 }
@@ -287,8 +298,38 @@ impl EthtoolMessage {
             vec![EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
                 EthtoolHeader::DevName(iface_name.to_string()),
             ]))];
+
         EthtoolMessage {
             cmd: EthtoolCmd::ChannelSet,
+            nlas,
+        }
+    }
+
+
+    pub fn new_module_eeprom_get(
+            iface_name: Option<&str>,
+            offset: u32,
+            length: u32,
+            page:u8,
+            bank:u8,
+            i2c_address:u8) -> Self {
+        let mut nlas = match iface_name {
+            Some(s) => {
+                vec![EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Header(vec![
+                    EthtoolHeader::DevName(s.to_string()),
+                ]))]
+            }
+            None => {
+                vec![EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Header(vec![]))]
+            }
+        };
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Offset(offset)));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Length(length)));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Page(page)));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Bank(bank)));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::I2CAddress(i2c_address)));
+        EthtoolMessage {
+            cmd: EthtoolCmd::ModuleEEPROMGet,
             nlas,
         }
     }
@@ -341,6 +382,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
                 cmd: EthtoolCmd::ChannelGetReply,
                 nlas: parse_channel_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY => Self {
+                cmd: EthtoolCmd::ModuleEEPROMGetReply,
+                nlas: parse_module_eeprom_nlas(buffer)?,
             },
             cmd => {
                 return Err(DecodeError::from(format!(

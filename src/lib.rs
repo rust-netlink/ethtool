@@ -4,6 +4,7 @@ mod bitset_util;
 mod channel;
 mod coalesce;
 mod connection;
+mod eeprom;
 mod error;
 mod feature;
 mod fec;
@@ -30,6 +31,7 @@ pub use coalesce::{
 #[cfg(feature = "tokio_socket")]
 pub use connection::new_connection;
 pub use connection::new_connection_with_socket;
+pub use eeprom::{EthtoolModuleEEPROMAttr, EthtoolModuleEEPROMGetRequest, EthtoolModuleEEPROMHandle};
 pub use error::EthtoolError;
 pub use feature::{
     EthtoolFeatureAttr, EthtoolFeatureBit, EthtoolFeatureGetRequest,
