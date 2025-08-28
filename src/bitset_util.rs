@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
 use log::warn;
-use netlink_packet_utils::{
-    nla::NlasIterator,
-    parsers::{parse_string, parse_u32},
-    DecodeError,
+use netlink_packet_core::{
+    parse_string, parse_u32, DecodeError, ErrorContext, NlasIterator,
 };
 
 const ETHTOOL_A_BITSET_BITS: u16 = 3;

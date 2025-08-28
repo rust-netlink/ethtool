@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
-    parsers::{parse_u32, parse_u8},
-    DecodeError, Emitable, Parseable,
+use netlink_packet_core::{
+    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -93,7 +90,7 @@ impl Nla for EthtoolRingAttr {
             | Self::RxJumbo(d)
             | Self::RxBufLen(d)
             | Self::CqeSize(d)
-            | Self::Tx(d) => NativeEndian::write_u32(buffer, *d),
+            | Self::Tx(d) => emit_u32(buffer, *d).unwrap(),
             Self::TcpDataSplit(d) => buffer[0] = *d,
             Self::TxPush(d) => buffer[0] = *d as u8,
             Self::Other(ref attr) => attr.emit(buffer),

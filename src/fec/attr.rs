@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
-    parsers::{parse_u32, parse_u64, parse_u8},
-    DecodeError, Emitable, Parseable,
+use netlink_packet_core::{
+    emit_u64, parse_u32, parse_u64, parse_u8, DecodeError, DefaultNla,
+    Emitable, ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable,
+    NLA_F_NESTED,
 };
 
 use crate::{
@@ -237,7 +235,7 @@ impl Nla for EthtoolFecStat {
         match self {
             Self::Corrected(v)
             | Self::Uncorrected(v)
-            | Self::CorrectBits(v) => NativeEndian::write_u64(buffer, *v),
+            | Self::CorrectBits(v) => emit_u64(buffer, *v).unwrap(),
             Self::Other(attr) => attr.emit(buffer),
         }
     }

@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
-    parsers::{parse_u64, parse_u8},
-    DecodeError, Emitable, Parseable,
+use netlink_packet_core::{
+    emit_u64, parse_u64, parse_u8, DecodeError, DefaultNla, Emitable,
+    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -45,7 +42,7 @@ impl Nla for EthtoolPauseStatAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Rx(value) | Self::Tx(value) => {
-                NativeEndian::write_u64(buffer, *value)
+                emit_u64(buffer, *value).unwrap()
             }
             Self::Other(ref attr) => attr.emit_value(buffer),
         }

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
 use log::warn;
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
-    parsers::{parse_string, parse_u32},
-    DecodeError, Emitable, Parseable,
+use netlink_packet_core::{
+    parse_string, parse_u32, DecodeError, DefaultNla, Emitable, ErrorContext,
+    Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
