@@ -2,12 +2,9 @@
 
 use std::ffi::CString;
 
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer},
-    parsers::{parse_string, parse_u32},
-    DecodeError, Parseable,
+use netlink_packet_core::{
+    emit_u32, parse_string, parse_u32, DecodeError, DefaultNla, ErrorContext,
+    Nla, NlaBuffer, Parseable,
 };
 
 const ALTIFNAMSIZ: usize = 128;
@@ -50,7 +47,7 @@ impl Nla for EthtoolHeader {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::DevIndex(value) | Self::Flags(value) => {
-                NativeEndian::write_u32(buffer, *value)
+                emit_u32(buffer, *value).unwrap()
             }
             Self::DevName(s) => {
                 str_to_zero_ended_u8_array(s, buffer, ALTIFNAMSIZ)

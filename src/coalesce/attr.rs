@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use anyhow::Context;
-use byteorder::{ByteOrder, NativeEndian};
-use netlink_packet_utils::{
-    nla::{DefaultNla, Nla, NlaBuffer, NlasIterator, NLA_F_NESTED},
-    parsers::{parse_u32, parse_u8},
-    DecodeError, Emitable, Parseable,
+use netlink_packet_core::{
+    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -145,9 +142,7 @@ impl Nla for EthtoolCoalesceAttr {
             | Self::RxMaxFramesHigh(d)
             | Self::TxUsecsHigh(d)
             | Self::TxMaxFramesHigh(d)
-            | Self::RateSampleInterval(d) => {
-                NativeEndian::write_u32(buffer, *d)
-            }
+            | Self::RateSampleInterval(d) => emit_u32(buffer, *d).unwrap(),
             Self::UseAdaptiveRx(d) | Self::UseAdaptiveTx(d) => {
                 buffer[0] = (*d).into()
             }

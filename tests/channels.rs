@@ -3,8 +3,8 @@
 use ethtool::{
     EthtoolAttr, EthtoolChannelAttr, EthtoolCmd, EthtoolHeader, EthtoolMessage,
 };
+use netlink_packet_core::{Emitable, Parseable, ParseableParametrized};
 use netlink_packet_generic::{GenlBuffer, GenlHeader};
-use netlink_packet_utils::{Emitable, Parseable, ParseableParametrized};
 
 #[test]
 fn test_channels_get_reply() {

@@ -3,7 +3,7 @@ name = "ethtool"
 version = "0.2.8"
 authors = ["Gris Ge <fge@redhat.com>"]
 license = "MIT"
-edition = "2018"
+edition = "2021"
 description = "Linux Ethtool Communication Library"
 keywords = ["network"]
 categories = ["network-programming", "os"]
@@ -20,16 +20,13 @@ tokio_socket = ["netlink-proto/tokio_socket", "tokio"]
 smol_socket = ["netlink-proto/smol_socket", "async-std"]
 
 [dependencies]
-anyhow = "1.0.97"
 async-std = { version = "1.13.0", optional = true}
-byteorder = "1.5.0"
 futures = "0.3.31"
 log = "0.4.26"
-genetlink = { default-features = false, version = "0.2.5"}
-netlink-packet-core = { version = "0.7.0"}
-netlink-packet-generic = { version = "0.3.3" }
-netlink-packet-utils = { version = "0.5.2" }
-netlink-proto = { default-features = false, version = "0.11.5" }
+genetlink = { default-features = false, version = "0.2.6"}
+netlink-packet-core = { version = "0.8.0"}
+netlink-packet-generic = { version = "0.4.0" }
+netlink-proto = { default-features = false, version = "0.12.0" }
 netlink-sys = { version = "0.8.7" }
 thiserror = "1.0.69"
 tokio = { version = "1.44.0", features = ["rt"], optional = true}
