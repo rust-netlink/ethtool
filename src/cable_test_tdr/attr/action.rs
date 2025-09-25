@@ -6,8 +6,7 @@ use netlink_packet_core::{
 };
 
 use crate::{
-    cable_test_tdr::attr::config::EthtoolCableTestTdrConfigAttr, EthtoolAttr,
-    EthtoolHeader,
+    cable_test_tdr::attr::config::EthtoolCableTestTdrConfigAttr, EthtoolHeader,
 };
 
 const ETHTOOL_A_CABLE_TEST_TDR_HEADER: u16 = 1;
@@ -78,18 +77,4 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             }
         }
     }
-}
-
-pub(crate) fn parse_cable_test_tdr_action_nlas(
-    buffer: &[u8],
-) -> Result<Vec<EthtoolAttr>, DecodeError> {
-    NlasIterator::new(buffer)
-        .map(|nla| {
-            let nla =
-                nla.context("failed to get ethtool cable test TDR action NLA")?;
-            let parsed = EthtoolCableTestTdrActionAttr::parse(&nla)
-                .context("failed to parse ethtool cable test TDR action NLA")?;
-            Ok(EthtoolAttr::CableTestTdrAction(parsed))
-        })
-        .collect()
 }

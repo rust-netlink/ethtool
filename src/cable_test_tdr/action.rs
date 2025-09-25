@@ -57,7 +57,7 @@ impl EthtoolCableTestTdrActionRequest {
         } = self;
 
         let ethtool_msg =
-            EthtoolMessage::new_cable_test_tdr(&iface_name, config);
+            EthtoolMessage::new_cable_test_tdr_action(&iface_name, config);
         let mut nl_msg =
             NetlinkMessage::from(GenlMessage::from_payload(ethtool_msg));
 

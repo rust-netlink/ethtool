@@ -80,9 +80,7 @@ impl Nla for EthtoolCableTestTdrNotifyAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Header(header) => header.as_slice().emit(buffer),
-            Self::Status(status) => {
-                buffer.get_mut(0).map(|b| *b = (*status).into()).unwrap()
-            }
+            Self::Status(status) => buffer[0] = (*status).into(),
             Self::Nest(nest) => nest.as_slice().emit(buffer),
             Self::Other(attr) => attr.emit(buffer),
         }

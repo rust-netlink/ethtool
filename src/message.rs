@@ -4,9 +4,7 @@ use netlink_packet_core::{DecodeError, Emitable, Nla, ParseableParametrized};
 use netlink_packet_generic::{GenlFamily, GenlHeader};
 
 use crate::{
-    cable_test_tdr::{
-        parse_cable_test_tdr_action_nlas, parse_cable_test_tdr_notify_nlas,
-    },
+    cable_test_tdr::parse_cable_test_tdr_notify_nlas,
     channel::{parse_channel_nlas, EthtoolChannelAttr},
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
@@ -312,7 +310,7 @@ impl EthtoolMessage {
         }
     }
 
-    pub fn new_cable_test_tdr(
+    pub fn new_cable_test_tdr_action(
         iface_name: &str,
         config: Option<EthtoolCableTestTdrConfig>,
     ) -> Self {
@@ -400,10 +398,6 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
                 cmd: EthtoolCmd::ChannelGetReply,
                 nlas: parse_channel_nlas(buffer)?,
-            },
-            ETHTOOL_MSG_CABLE_TEST_TDR_ACT => Self {
-                cmd: EthtoolCmd::CableTestTdrAction,
-                nlas: parse_cable_test_tdr_action_nlas(buffer)?,
             },
             ETHTOOL_MSG_CABLE_TEST_TDR_NTF => Self {
                 cmd: EthtoolCmd::CableTestTdrNotify,

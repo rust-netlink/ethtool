@@ -8,7 +8,6 @@ mod notify;
 mod pulse;
 mod step;
 
-pub(crate) use action::parse_cable_test_tdr_action_nlas;
 pub(crate) use notify::parse_cable_test_tdr_notify_nlas;
 
 pub use action::EthtoolCableTestTdrActionAttr;

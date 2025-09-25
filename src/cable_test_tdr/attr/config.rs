@@ -47,9 +47,7 @@ impl Nla for EthtoolCableTestTdrConfigAttr {
             Self::First(first) => emit_u32(buffer, *first).unwrap(),
             Self::Last(last) => emit_u32(buffer, *last).unwrap(),
             Self::Step(step) => emit_u32(buffer, *step).unwrap(),
-            Self::Pair(pair) => {
-                buffer.get_mut(0).map(|b| *b = (*pair).into()).unwrap()
-            }
+            Self::Pair(pair) => buffer[0] = (*pair).into(),
             Self::Other(attr) => attr.emit(buffer),
         }
     }

@@ -36,9 +36,7 @@ impl Nla for EthtoolCableTestTdrAmplitudeAttr {
 
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
-            Self::Pair(pair) => {
-                buffer.get_mut(0).map(|b| *b = (*pair).into()).unwrap()
-            }
+            Self::Pair(pair) => buffer[0] = (*pair).into(),
             Self::Mv(mv) => emit_i16(buffer, *mv).unwrap(),
             Self::Other(attr) => attr.emit(buffer),
         }
