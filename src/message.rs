@@ -4,6 +4,9 @@ use netlink_packet_core::{DecodeError, Emitable, Nla, ParseableParametrized};
 use netlink_packet_generic::{GenlFamily, GenlHeader};
 
 use crate::{
+    cable_test_tdr::{
+        parse_cable_test_tdr_action_nlas, parse_cable_test_tdr_notify_nlas,
+    },
     channel::{parse_channel_nlas, EthtoolChannelAttr},
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
@@ -12,6 +15,8 @@ use crate::{
     pause::{parse_pause_nlas, EthtoolPauseAttr},
     ring::{parse_ring_nlas, EthtoolRingAttr},
     tsinfo::{parse_tsinfo_nlas, EthtoolTsInfoAttr},
+    EthtoolCableTestTdrActionAttr, EthtoolCableTestTdrConfig,
+    EthtoolCableTestTdrConfigAttr, EthtoolCableTestTdrNotifyAttr,
     EthtoolHeader,
 };
 
@@ -32,6 +37,8 @@ const ETHTOOL_MSG_FEC_GET_REPLY: u8 = 30;
 const ETHTOOL_MSG_CHANNELS_GET: u8 = 17;
 const ETHTOOL_MSG_CHANNELS_GET_REPLY: u8 = 18;
 const ETHTOOL_MSG_CHANNELS_SET: u8 = 18;
+const ETHTOOL_MSG_CABLE_TEST_TDR_ACT: u8 = 27;
+const ETHTOOL_MSG_CABLE_TEST_TDR_NTF: u8 = 28;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolCmd {
@@ -52,6 +59,8 @@ pub enum EthtoolCmd {
     ChannelGet,
     ChannelGetReply,
     ChannelSet,
+    CableTestTdrAction,
+    CableTestTdrNotify,
 }
 
 impl From<EthtoolCmd> for u8 {
@@ -74,6 +83,8 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::ChannelGet => ETHTOOL_MSG_CHANNELS_GET,
             EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
             EthtoolCmd::ChannelSet => ETHTOOL_MSG_CHANNELS_SET,
+            EthtoolCmd::CableTestTdrAction => ETHTOOL_MSG_CABLE_TEST_TDR_ACT,
+            EthtoolCmd::CableTestTdrNotify => ETHTOOL_MSG_CABLE_TEST_TDR_NTF,
         }
     }
 }
@@ -88,6 +99,8 @@ pub enum EthtoolAttr {
     TsInfo(EthtoolTsInfoAttr),
     Fec(EthtoolFecAttr),
     Channel(EthtoolChannelAttr),
+    CableTestTdrAction(EthtoolCableTestTdrActionAttr),
+    CableTestTdrNotify(EthtoolCableTestTdrNotifyAttr),
 }
 
 impl Nla for EthtoolAttr {
@@ -101,6 +114,8 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.value_len(),
             Self::Fec(attr) => attr.value_len(),
             Self::Channel(attr) => attr.value_len(),
+            Self::CableTestTdrAction(attr) => attr.value_len(),
+            Self::CableTestTdrNotify(attr) => attr.value_len(),
         }
     }
 
@@ -114,6 +129,8 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.kind(),
             Self::Fec(attr) => attr.kind(),
             Self::Channel(attr) => attr.kind(),
+            Self::CableTestTdrAction(attr) => attr.kind(),
+            Self::CableTestTdrNotify(attr) => attr.kind(),
         }
     }
 
@@ -127,6 +144,8 @@ impl Nla for EthtoolAttr {
             Self::TsInfo(attr) => attr.emit_value(buffer),
             Self::Fec(attr) => attr.emit_value(buffer),
             Self::Channel(attr) => attr.emit_value(buffer),
+            Self::CableTestTdrAction(attr) => attr.emit_value(buffer),
+            Self::CableTestTdrNotify(attr) => attr.emit_value(buffer),
         }
     }
 }
@@ -292,6 +311,46 @@ impl EthtoolMessage {
             nlas,
         }
     }
+
+    pub fn new_cable_test_tdr(
+        iface_name: &str,
+        config: Option<EthtoolCableTestTdrConfig>,
+    ) -> Self {
+        let mut nlas = vec![EthtoolAttr::CableTestTdrAction(
+            EthtoolCableTestTdrActionAttr::Header(vec![
+                EthtoolHeader::DevName(iface_name.to_string()),
+            ]),
+        )];
+
+        // Append optional config entries.
+        if let Some(cfg) = config {
+            let mut config_attrs = Vec::new();
+
+            if let Some(first) = cfg.first {
+                config_attrs.push(EthtoolCableTestTdrConfigAttr::First(first));
+            }
+            if let Some(last) = cfg.last {
+                config_attrs.push(EthtoolCableTestTdrConfigAttr::Last(last));
+            }
+            if let Some(step) = cfg.step {
+                config_attrs.push(EthtoolCableTestTdrConfigAttr::Step(step));
+            }
+            if let Some(pair) = cfg.pair {
+                config_attrs.push(EthtoolCableTestTdrConfigAttr::Pair(pair));
+            }
+
+            if !config_attrs.is_empty() {
+                nlas.push(EthtoolAttr::CableTestTdrAction(
+                    EthtoolCableTestTdrActionAttr::Config(config_attrs),
+                ));
+            }
+        }
+
+        EthtoolMessage {
+            cmd: EthtoolCmd::CableTestTdrAction,
+            nlas,
+        }
+    }
 }
 
 impl Emitable for EthtoolMessage {
@@ -341,6 +400,14 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             ETHTOOL_MSG_CHANNELS_GET_REPLY => Self {
                 cmd: EthtoolCmd::ChannelGetReply,
                 nlas: parse_channel_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_CABLE_TEST_TDR_ACT => Self {
+                cmd: EthtoolCmd::CableTestTdrAction,
+                nlas: parse_cable_test_tdr_action_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_CABLE_TEST_TDR_NTF => Self {
+                cmd: EthtoolCmd::CableTestTdrNotify,
+                nlas: parse_cable_test_tdr_notify_nlas(buffer)?,
             },
             cmd => {
                 return Err(DecodeError::from(format!(

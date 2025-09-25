@@ -32,7 +32,8 @@ thiserror = "1.0.69"
 tokio = { version = "1.44.0", features = ["rt"], optional = true}
 
 [dev-dependencies]
-tokio = { version = "1.44.0", features = ["macros", "rt", "rt-multi-thread"] }
+anyhow = "1.0.100"
+tokio = { version = "1.44.0", features = ["macros", "rt", "rt-multi-thread", "time"] }
 env_logger = "0.9.3"
 
 [[example]]
