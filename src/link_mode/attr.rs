@@ -23,7 +23,7 @@ const DUPLEX_HALF: u8 = 0x00;
 const DUPLEX_FULL: u8 = 0x01;
 const DUPLEX_UNKNOWN: u8 = 0xff;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EthtoolLinkModeDuplex {
     Half,
     Full,
@@ -38,6 +38,17 @@ impl From<u8> for EthtoolLinkModeDuplex {
             DUPLEX_FULL => Self::Full,
             DUPLEX_UNKNOWN => Self::Unknown,
             _ => Self::Other(d),
+        }
+    }
+}
+
+impl From<EthtoolLinkModeDuplex> for u8 {
+    fn from(v: EthtoolLinkModeDuplex) -> u8 {
+        match v {
+            EthtoolLinkModeDuplex::Half => DUPLEX_HALF,
+            EthtoolLinkModeDuplex::Full => DUPLEX_FULL,
+            EthtoolLinkModeDuplex::Unknown => DUPLEX_UNKNOWN,
+            EthtoolLinkModeDuplex::Other(d) => d,
         }
     }
 }
