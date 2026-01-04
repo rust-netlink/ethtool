@@ -16,12 +16,14 @@ pub struct EthtoolModuleEEPROMGetRequest {
 }
 
 impl EthtoolModuleEEPROMGetRequest {
-    pub(crate) fn new(handle: EthtoolHandle, iface_name: Option<&str>,
-            offset: u32,
-            length: u32,
-            page: u8,
-            bank: u8,
-            i2c_address: u8
+    pub(crate) fn new(
+        handle: EthtoolHandle,
+        iface_name: Option<&str>,
+        offset: u32,
+        length: u32,
+        page: u8,
+        bank: u8,
+        i2c_address: u8,
     ) -> Self {
         EthtoolModuleEEPROMGetRequest {
             handle,
@@ -30,7 +32,7 @@ impl EthtoolModuleEEPROMGetRequest {
             length,
             page,
             bank,
-            i2c_address
+            i2c_address,
         }
     }
 
@@ -45,10 +47,17 @@ impl EthtoolModuleEEPROMGetRequest {
             length,
             page,
             bank,
-            i2c_address
+            i2c_address,
         } = self;
 
-        let ethtool_msg = EthtoolMessage::new_module_eeprom_get(iface_name.as_deref(), offset, length, page, bank, i2c_address);
+        let ethtool_msg = EthtoolMessage::new_module_eeprom_get(
+            iface_name.as_deref(),
+            offset,
+            length,
+            page,
+            bank,
+            i2c_address,
+        );
         ethtool_execute(&mut handle, iface_name.is_none(), ethtool_msg).await
     }
 }

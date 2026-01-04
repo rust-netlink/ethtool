@@ -6,9 +6,9 @@ use netlink_packet_generic::{GenlFamily, GenlHeader};
 use crate::{
     channel::{parse_channel_nlas, EthtoolChannelAttr},
     coalesce::{parse_coalesce_nlas, EthtoolCoalesceAttr},
+    eeprom::{parse_module_eeprom_nlas, EthtoolModuleEEPROMAttr},
     feature::{parse_feature_nlas, EthtoolFeatureAttr},
     fec::{parse_fec_nlas, EthtoolFecAttr},
-    eeprom::{parse_module_eeprom_nlas, EthtoolModuleEEPROMAttr},
     link_mode::{parse_link_mode_nlas, EthtoolLinkModeAttr},
     pause::{parse_pause_nlas, EthtoolPauseAttr},
     ring::{parse_ring_nlas, EthtoolRingAttr},
@@ -80,7 +80,9 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::ChannelGetReply => ETHTOOL_MSG_CHANNELS_GET_REPLY,
             EthtoolCmd::ChannelSet => ETHTOOL_MSG_CHANNELS_SET,
             EthtoolCmd::ModuleEEPROMGet => ETHTOOL_MSG_MODULE_EEPROM_GET,
-            EthtoolCmd::ModuleEEPROMGetReply => ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY,
+            EthtoolCmd::ModuleEEPROMGetReply => {
+                ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY
+            }
         }
     }
 }
@@ -305,29 +307,43 @@ impl EthtoolMessage {
         }
     }
 
-
     pub fn new_module_eeprom_get(
-            iface_name: Option<&str>,
-            offset: u32,
-            length: u32,
-            page:u8,
-            bank:u8,
-            i2c_address:u8) -> Self {
+        iface_name: Option<&str>,
+        offset: u32,
+        length: u32,
+        page: u8,
+        bank: u8,
+        i2c_address: u8,
+    ) -> Self {
         let mut nlas = match iface_name {
             Some(s) => {
-                vec![EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Header(vec![
-                    EthtoolHeader::DevName(s.to_string()),
-                ]))]
+                vec![EthtoolAttr::ModuleEEPROM(
+                    EthtoolModuleEEPROMAttr::Header(vec![
+                        EthtoolHeader::DevName(s.to_string()),
+                    ]),
+                )]
             }
             None => {
-                vec![EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Header(vec![]))]
+                vec![EthtoolAttr::ModuleEEPROM(
+                    EthtoolModuleEEPROMAttr::Header(vec![]),
+                )]
             }
         };
-        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Offset(offset)));
-        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Length(length)));
-        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Page(page)));
-        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Bank(bank)));
-        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::I2CAddress(i2c_address)));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Offset(
+            offset,
+        )));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Length(
+            length,
+        )));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Page(
+            page,
+        )));
+        nlas.push(EthtoolAttr::ModuleEEPROM(EthtoolModuleEEPROMAttr::Bank(
+            bank,
+        )));
+        nlas.push(EthtoolAttr::ModuleEEPROM(
+            EthtoolModuleEEPROMAttr::I2CAddress(i2c_address),
+        ));
         EthtoolMessage {
             cmd: EthtoolCmd::ModuleEEPROMGet,
             nlas,
