@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures::stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 
 #[test]
 // CI container normally have a veth for external communication which support

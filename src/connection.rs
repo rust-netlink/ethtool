@@ -2,7 +2,7 @@
 
 use std::io;
 
-use futures::channel::mpsc::UnboundedReceiver;
+use futures_channel::mpsc::UnboundedReceiver;
 use genetlink::message::RawGenlMessage;
 use netlink_packet_core::NetlinkMessage;
 use netlink_proto::Connection;
