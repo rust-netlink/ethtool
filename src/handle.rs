@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures::{future::Either, FutureExt, Stream, StreamExt, TryStream};
+use futures_util::{future::Either, FutureExt, Stream, StreamExt, TryStream};
 use genetlink::GenetlinkHandle;
 use netlink_packet_core::DecodeError;
 use netlink_packet_core::{
@@ -106,9 +106,10 @@ pub(crate) async fn ethtool_execute(
             Either::Left(response.map(move |msg| Ok(try_ethtool!(msg))))
         }
         Err(e) => Either::Right(
-            futures::future::err::<GenlMessage<EthtoolMessage>, EthtoolError>(
-                e,
-            )
+            futures_util::future::err::<
+                GenlMessage<EthtoolMessage>,
+                EthtoolError,
+            >(e)
             .into_stream(),
         ),
     }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures::stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 
 // Once we find a way to load netsimdev kernel module in CI, we can convert this
 // to a test

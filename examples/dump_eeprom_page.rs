@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures::stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 
 fn main() {
     let rt = tokio::runtime::Builder::new_current_thread()

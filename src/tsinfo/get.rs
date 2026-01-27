@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures::TryStream;
+use futures_util::TryStream;
 use netlink_packet_generic::GenlMessage;
 
 use crate::{ethtool_execute, EthtoolError, EthtoolHandle, EthtoolMessage};
