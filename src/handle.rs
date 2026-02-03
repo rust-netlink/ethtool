@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::{future::Either, FutureExt, Stream, StreamExt, TryStream};
+use futures_util::{Stream, StreamExt};
 use genetlink::GenetlinkHandle;
 use netlink_packet_core::DecodeError;
 use netlink_packet_core::{
@@ -83,7 +83,10 @@ pub(crate) async fn ethtool_execute(
     handle: &mut EthtoolHandle,
     is_dump: bool,
     ethtool_msg: EthtoolMessage,
-) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError> {
+) -> Result<
+    impl Stream<Item = Result<GenlMessage<EthtoolMessage>, EthtoolError>>,
+    EthtoolError,
+> {
     let nl_header_flags = if is_dump {
         // The NLM_F_ACK is required due to bug of kernel:
         //  https://bugzilla.redhat.com/show_bug.cgi?id=1953847
@@ -101,16 +104,8 @@ pub(crate) async fn ethtool_execute(
 
     nl_msg.header.flags = nl_header_flags;
 
-    match handle.request(nl_msg).await {
-        Ok(response) => {
-            Either::Left(response.map(move |msg| Ok(try_ethtool!(msg))))
-        }
-        Err(e) => Either::Right(
-            futures_util::future::err::<
-                GenlMessage<EthtoolMessage>,
-                EthtoolError,
-            >(e)
-            .into_stream(),
-        ),
-    }
+    Ok(handle
+        .request(nl_msg)
+        .await?
+        .map(move |msg| Ok(try_ethtool!(msg))))
 }

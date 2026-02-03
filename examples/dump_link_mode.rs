@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::TryStreamExt;
+use futures_util::stream::StreamExt;
 
 // Once we find a way to load netsimdev kernel module in CI, we can convert this
 // to a test
@@ -17,10 +17,10 @@ async fn get_link_mode(iface_name: Option<&str>) {
     tokio::spawn(connection);
 
     let mut link_mode_handle =
-        handle.link_mode().get(iface_name).execute().await;
+        handle.link_mode().get(iface_name).execute().await.unwrap();
 
     let mut msgs = Vec::new();
-    while let Some(msg) = link_mode_handle.try_next().await.unwrap() {
+    while let Some(Ok(msg)) = link_mode_handle.next().await {
         msgs.push(msg);
     }
     assert!(!msgs.is_empty());

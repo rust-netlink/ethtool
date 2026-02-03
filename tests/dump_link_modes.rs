@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::TryStreamExt;
+use futures_util::stream::StreamExt;
 
 #[test]
 // CI container normally have a veth for external communication which support
@@ -17,10 +17,11 @@ async fn dump_link_modes() {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
-    let mut link_modes_handle = handle.link_mode().get(None).execute().await;
+    let mut link_modes_handle =
+        handle.link_mode().get(None).execute().await.unwrap();
 
     let mut msgs = Vec::new();
-    while let Some(msg) = link_modes_handle.try_next().await.unwrap() {
+    while let Some(Ok(msg)) = link_modes_handle.next().await {
         msgs.push(msg);
     }
     assert!(!msgs.is_empty());

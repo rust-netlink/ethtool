@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::TryStreamExt;
+use futures_util::stream::StreamExt;
 
 // Once we find a way to load netsimdev kernel module in CI, we can convert this
 // to a test
@@ -16,11 +16,12 @@ async fn get_coalesce(iface_name: Option<&str>) {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
-    let mut coalesce_handle = handle.coalesce().get(iface_name).execute().await;
+    let mut coalesce_handle =
+        handle.coalesce().get(iface_name).execute().await.unwrap();
 
     let mut msgs = Vec::new();
-    while let Some(msg) = coalesce_handle.try_next().await.unwrap() {
-        msgs.push(msg);
+    while let Some(Ok(msg)) = coalesce_handle.next().await {
+        msgs.push(msg.payload);
     }
     assert!(!msgs.is_empty());
     for msg in msgs {

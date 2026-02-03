@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::TryStreamExt;
+use futures_util::stream::StreamExt;
 
 #[test]
 fn test_get_features_of_loopback() {
@@ -15,10 +15,11 @@ async fn get_feature(iface_name: Option<&str>) {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
-    let mut feature_handle = handle.feature().get(iface_name).execute().await;
+    let mut feature_handle =
+        handle.feature().get(iface_name).execute().await.unwrap();
 
     let mut msgs = Vec::new();
-    while let Some(msg) = feature_handle.try_next().await.unwrap() {
+    while let Some(Ok(msg)) = feature_handle.next().await {
         msgs.push(msg);
     }
     assert!(msgs.len() == 1);
