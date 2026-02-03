@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::TryStream;
+use futures_util::Stream;
 use netlink_packet_generic::GenlMessage;
 
 use crate::{ethtool_execute, EthtoolError, EthtoolHandle, EthtoolMessage};
@@ -20,8 +20,10 @@ impl EthtoolChannelGetRequest {
 
     pub async fn execute(
         self,
-    ) -> impl TryStream<Ok = GenlMessage<EthtoolMessage>, Error = EthtoolError>
-    {
+    ) -> Result<
+        impl Stream<Item = Result<GenlMessage<EthtoolMessage>, EthtoolError>>,
+        EthtoolError,
+    > {
         let EthtoolChannelGetRequest {
             mut handle,
             iface_name,

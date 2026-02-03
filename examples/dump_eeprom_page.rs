@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::TryStreamExt;
+use futures_util::stream::StreamExt;
 
 fn main() {
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -19,10 +19,11 @@ async fn get_eeprom(iface_name: Option<&str>) {
         .eeprom()
         .get(iface_name, 0, 1, 0, 0, 0x50)
         .execute()
-        .await;
+        .await
+        .unwrap();
 
     let mut msgs = Vec::new();
-    while let Some(msg) = eeprom_handle.try_next().await.unwrap() {
+    while let Some(Ok(msg)) = eeprom_handle.next().await {
         msgs.push(msg);
     }
     assert!(!msgs.is_empty());
