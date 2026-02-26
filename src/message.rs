@@ -87,9 +87,9 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::ModuleEEPROMGet => ETHTOOL_MSG_MODULE_EEPROM_GET,
             EthtoolCmd::ModuleEEPROMGetReply => {
                 ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY
-            },
+            }
             EthtoolCmd::LinkStateGet => ETHTOOL_MSG_LINKSTATE_GET,
-            EthtoolCmd::LinkStateGetReply => ETHTOOL_MSG_LINKSTATE_GET_REPLY
+            EthtoolCmd::LinkStateGetReply => ETHTOOL_MSG_LINKSTATE_GET_REPLY,
         }
     }
 }

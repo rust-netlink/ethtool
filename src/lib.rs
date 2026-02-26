@@ -48,8 +48,7 @@ pub use link_mode::{
     EthtoolLinkModeHandle,
 };
 pub use link_state::{
-    EthtoolLinkStateAttr, EthtoolLinkStateGetRequest,
-    EthtoolLinkStateHandle,
+    EthtoolLinkStateAttr, EthtoolLinkStateGetRequest, EthtoolLinkStateHandle,
 };
 pub use message::{EthtoolAttr, EthtoolCmd, EthtoolMessage};
 pub use pause::{

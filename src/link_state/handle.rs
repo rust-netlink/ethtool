@@ -9,7 +9,7 @@ impl EthtoolLinkStateHandle {
         EthtoolLinkStateHandle(handle)
     }
 
-    /// Retrieve the current link state of an interface 
+    /// Retrieve the current link state of an interface
     pub fn get(
         &mut self,
         iface_name: Option<&str>,

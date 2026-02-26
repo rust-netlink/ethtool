@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    parse_u32, parse_u8, DecodeError, DefaultNla, Emitable, ErrorContext, 
-    Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    parse_u32, parse_u8, DecodeError, DefaultNla, Emitable, ErrorContext, Nla,
+    NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -67,8 +67,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
         Ok(match buf.kind() {
             ETHTOOL_A_LINKSTATE_HEADER => {
                 let mut nlas = Vec::new();
-                let error_msg =
-                    "failed to parse link state header attributes";
+                let error_msg = "failed to parse link state header attributes";
                 for nla in NlasIterator::new(payload) {
                     let nla = &nla.context(error_msg)?;
                     let parsed =
@@ -94,16 +93,16 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u8(payload)
                     .context("invalid ETHTOOL_A_LINKSTATE_EXT_STATE value")?,
             ),
-            ETHTOOL_A_LINKSTATE_EXT_SUBSTATE => Self::ExtSubstate(
-                parse_u8(payload).context(
+            ETHTOOL_A_LINKSTATE_EXT_SUBSTATE => {
+                Self::ExtSubstate(parse_u8(payload).context(
                     "invalid ETHTOOL_A_LINKSTATE_EXT_SUBSTATE value",
-                )?,
-            ),
-            ETHTOOL_A_LINKSTATE_EXT_DOWN_CNT => Self::ExtDownCnt(
-                parse_u32(payload).context(
+                )?)
+            }
+            ETHTOOL_A_LINKSTATE_EXT_DOWN_CNT => {
+                Self::ExtDownCnt(parse_u32(payload).context(
                     "invalid ETHTOOL_A_LINKSTATE_EXT_DOWN_CNT value",
-                )?,
-            ),
+                )?)
+            }
             _ => Self::Other(
                 DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
             ),

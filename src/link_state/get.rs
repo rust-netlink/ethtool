@@ -11,10 +11,7 @@ pub struct EthtoolLinkStateGetRequest {
 }
 
 impl EthtoolLinkStateGetRequest {
-    pub(crate) fn new(
-        handle: EthtoolHandle,
-        iface_name: Option<&str>,
-    ) -> Self {
+    pub(crate) fn new(handle: EthtoolHandle, iface_name: Option<&str>) -> Self {
         EthtoolLinkStateGetRequest {
             handle,
             iface_name: iface_name.map(|i| i.to_string()),
