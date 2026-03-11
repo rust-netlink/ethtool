@@ -13,7 +13,8 @@ impl EthtoolLinkStateHandle {
     pub fn get(
         &mut self,
         iface_name: Option<&str>,
+        flags: Option<u32>,
     ) -> EthtoolLinkStateGetRequest {
-        EthtoolLinkStateGetRequest::new(self.0.clone(), iface_name)
+        EthtoolLinkStateGetRequest::new(self.0.clone(), iface_name, flags)
     }
 }
