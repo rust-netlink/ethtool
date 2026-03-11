@@ -361,19 +361,19 @@ impl EthtoolMessage {
         }
     }
 
-    pub fn new_link_state_get(iface_name: Option<&str>) -> Self {
-        let nlas = match iface_name {
-            Some(s) => {
-                vec![EthtoolAttr::LinkState(EthtoolLinkStateAttr::Header(
-                    vec![EthtoolHeader::DevName(s.to_string())],
-                ))]
-            }
-            None => {
-                vec![EthtoolAttr::LinkState(EthtoolLinkStateAttr::Header(
-                    vec![],
-                ))]
-            }
-        };
+    pub fn new_link_state_get(
+        iface_name: Option<&str>,
+        flags: Option<u32>,
+    ) -> Self {
+        let mut header = vec![];
+        if let Some(s) = iface_name {
+            header.push(EthtoolHeader::DevName(s.to_string()))
+        }
+        if let Some(f) = flags {
+            header.push(EthtoolHeader::Flags(f))
+        }
+        let nlas =
+            vec![EthtoolAttr::LinkState(EthtoolLinkStateAttr::Header(header))];
         EthtoolMessage {
             cmd: EthtoolCmd::LinkStateGet,
             nlas,
