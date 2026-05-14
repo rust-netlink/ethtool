@@ -1,7 +1,7 @@
 [package]
 name = "ethtool"
 version = "0.2.9"
-authors = ["Gris Ge <fge@redhat.com>"]
+authors = ["Gris Ge <cnfourt@gmail.com>"]
 license = "MIT"
 edition = "2021"
 description = "Linux Ethtool Communication Library"
