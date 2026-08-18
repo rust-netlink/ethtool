@@ -1,4 +1,16 @@
 # Changelog
+## [0.3.0] - 2026-08-18
+### Breaking changes
+ - Use latest rust-netlink crates. (7f6f09d)
+
+### New features
+ - Change TryStream to Stream. (15810b2)
+ - Adding support for dumping eeprom pages.. (f923530)
+
+### Bug fixes
+ - Cargo: Use `futures-util` and `futures-channel` to replace `futures` crate. (f79bc8b)
+ - link_mode: Support convert EthtoolLinkModeDuplex to u8. (64382a5)
+
 ## [0.2.9] - 2025-08-28
 ### Breaking changes
  - N/A
