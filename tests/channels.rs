@@ -3,8 +3,8 @@
 use ethtool::{
     EthtoolAttr, EthtoolChannelAttr, EthtoolCmd, EthtoolHeader, EthtoolMessage,
 };
-use netlink_packet_core::{Emitable, Parseable, ParseableParametrized};
-use netlink_packet_generic::{GenlBuffer, GenlHeader};
+use netlink_packet_core::{Emitable, ParseableParametrized};
+use netlink_packet_generic::GenlHeader;
 
 #[test]
 fn test_channels_get_reply() {
@@ -27,7 +27,7 @@ fn test_channels_get_reply() {
         ],
     };
 
-    let header = GenlHeader::parse(&GenlBuffer::new(&raw)).unwrap();
+    let header = GenlHeader::parse(&raw[..]).unwrap();
 
     assert_eq!(
         expected,
