@@ -30,6 +30,150 @@ const ETHTOOL_A_COALESCE_RX_MAX_FRAMES_HIGH: u16 = 20;
 const ETHTOOL_A_COALESCE_TX_USECS_HIGH: u16 = 21;
 const ETHTOOL_A_COALESCE_TX_MAX_FRAMES_HIGH: u16 = 22;
 const ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL: u16 = 23;
+const ETHTOOL_A_COALESCE_USE_CQE_MODE_TX: u16 = 24;
+const ETHTOOL_A_COALESCE_USE_CQE_MODE_RX: u16 = 25;
+const ETHTOOL_A_COALESCE_TX_AGGR_MAX_BYTES: u16 = 26;
+const ETHTOOL_A_COALESCE_TX_AGGR_MAX_FRAMES: u16 = 27;
+const ETHTOOL_A_COALESCE_TX_AGGR_TIME_USECS: u16 = 28;
+const ETHTOOL_A_COALESCE_RX_PROFILE: u16 = 29;
+const ETHTOOL_A_COALESCE_TX_PROFILE: u16 = 30;
+const ETHTOOL_A_COALESCE_RX_CQE_FRAMES: u16 = 31;
+const ETHTOOL_A_COALESCE_RX_CQE_NSECS: u16 = 32;
+
+const ETHTOOL_A_PROFILE_IRQ_MODERATION: u16 = 1;
+
+const ETHTOOL_A_IRQ_MODERATION_USEC: u16 = 1;
+const ETHTOOL_A_IRQ_MODERATION_PKTS: u16 = 2;
+const ETHTOOL_A_IRQ_MODERATION_COMPS: u16 = 3;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EthtoolCoalesceIrqModerationAttr {
+    Usec(u32),
+    Pkts(u32),
+    Comps(u32),
+    Other(DefaultNla),
+}
+
+impl Nla for EthtoolCoalesceIrqModerationAttr {
+    fn value_len(&self) -> usize {
+        match self {
+            Self::Usec(_) | Self::Pkts(_) | Self::Comps(_) => 4,
+            Self::Other(attr) => attr.value_len(),
+        }
+    }
+
+    fn kind(&self) -> u16 {
+        match self {
+            Self::Usec(_) => ETHTOOL_A_IRQ_MODERATION_USEC,
+            Self::Pkts(_) => ETHTOOL_A_IRQ_MODERATION_PKTS,
+            Self::Comps(_) => ETHTOOL_A_IRQ_MODERATION_COMPS,
+            Self::Other(attr) => attr.kind(),
+        }
+    }
+
+    fn emit_value(&self, buffer: &mut [u8]) {
+        match self {
+            Self::Usec(d) | Self::Pkts(d) | Self::Comps(d) => {
+                emit_u32(buffer, *d).unwrap()
+            }
+            Self::Other(ref attr) => attr.emit_value(buffer),
+        }
+    }
+}
+
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolCoalesceIrqModerationAttr
+{
+    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+        let payload = buf.value();
+        Ok(match buf.kind() {
+            ETHTOOL_A_IRQ_MODERATION_USEC => Self::Usec(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_IRQ_MODERATION_USEC value")?,
+            ),
+            ETHTOOL_A_IRQ_MODERATION_PKTS => Self::Pkts(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_IRQ_MODERATION_PKTS value")?,
+            ),
+            ETHTOOL_A_IRQ_MODERATION_COMPS => Self::Comps(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_IRQ_MODERATION_COMPS value")?,
+            ),
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EthtoolCoalesceProfileAttr {
+    IrqModeration(Vec<EthtoolCoalesceIrqModerationAttr>),
+    Other(DefaultNla),
+}
+
+impl Nla for EthtoolCoalesceProfileAttr {
+    fn value_len(&self) -> usize {
+        match self {
+            Self::IrqModeration(nlas) => nlas.as_slice().buffer_len(),
+            Self::Other(attr) => attr.value_len(),
+        }
+    }
+
+    fn kind(&self) -> u16 {
+        match self {
+            Self::IrqModeration(_) => {
+                ETHTOOL_A_PROFILE_IRQ_MODERATION | NLA_F_NESTED
+            }
+            Self::Other(attr) => attr.kind(),
+        }
+    }
+
+    fn emit_value(&self, buffer: &mut [u8]) {
+        match self {
+            Self::IrqModeration(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
+        }
+    }
+}
+
+impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
+    for EthtoolCoalesceProfileAttr
+{
+    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+        let payload = buf.value();
+        Ok(match buf.kind() {
+            ETHTOOL_A_PROFILE_IRQ_MODERATION => {
+                let mut nlas = Vec::new();
+                let error_msg = "failed to parse irq moderation attributes";
+                for nla in NlasIterator::new(payload) {
+                    let nla = &nla.context(error_msg)?;
+                    let parsed = EthtoolCoalesceIrqModerationAttr::parse(nla)
+                        .context(error_msg)?;
+                    nlas.push(parsed);
+                }
+                Self::IrqModeration(nlas)
+            }
+            _ => Self::Other(
+                DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
+            ),
+        })
+    }
+}
+
+fn parse_profile_nlas(
+    payload: &[u8],
+) -> Result<Vec<EthtoolCoalesceProfileAttr>, DecodeError> {
+    let mut nlas = Vec::new();
+    let error_msg = "failed to parse coalesce profile attributes";
+    for nla in NlasIterator::new(payload) {
+        let nla = &nla.context(error_msg)?;
+        let parsed =
+            EthtoolCoalesceProfileAttr::parse(nla).context(error_msg)?;
+        nlas.push(parsed);
+    }
+    Ok(nlas)
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EthtoolCoalesceAttr {
@@ -56,6 +200,15 @@ pub enum EthtoolCoalesceAttr {
     TxUsecsHigh(u32),
     TxMaxFramesHigh(u32),
     RateSampleInterval(u32),
+    UseCqeModeTx(bool),
+    UseCqeModeRx(bool),
+    TxAggrMaxBytes(u32),
+    TxAggrMaxFrames(u32),
+    TxAggrTimeUsecs(u32),
+    RxProfile(Vec<EthtoolCoalesceProfileAttr>),
+    TxProfile(Vec<EthtoolCoalesceProfileAttr>),
+    RxCqeFrames(u32),
+    RxCqeNsecs(u32),
     Other(DefaultNla),
 }
 
@@ -82,8 +235,19 @@ impl Nla for EthtoolCoalesceAttr {
             | Self::RxMaxFramesHigh(_)
             | Self::TxUsecsHigh(_)
             | Self::TxMaxFramesHigh(_)
-            | Self::RateSampleInterval(_) => 4,
-            Self::UseAdaptiveRx(_) | Self::UseAdaptiveTx(_) => 1,
+            | Self::RateSampleInterval(_)
+            | Self::TxAggrMaxBytes(_)
+            | Self::TxAggrMaxFrames(_)
+            | Self::TxAggrTimeUsecs(_)
+            | Self::RxCqeFrames(_)
+            | Self::RxCqeNsecs(_) => 4,
+            Self::UseAdaptiveRx(_)
+            | Self::UseAdaptiveTx(_)
+            | Self::UseCqeModeTx(_)
+            | Self::UseCqeModeRx(_) => 1,
+            Self::RxProfile(nlas) | Self::TxProfile(nlas) => {
+                nlas.as_slice().buffer_len()
+            }
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -115,6 +279,15 @@ impl Nla for EthtoolCoalesceAttr {
             Self::RateSampleInterval(_) => {
                 ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL
             }
+            Self::UseCqeModeTx(_) => ETHTOOL_A_COALESCE_USE_CQE_MODE_TX,
+            Self::UseCqeModeRx(_) => ETHTOOL_A_COALESCE_USE_CQE_MODE_RX,
+            Self::TxAggrMaxBytes(_) => ETHTOOL_A_COALESCE_TX_AGGR_MAX_BYTES,
+            Self::TxAggrMaxFrames(_) => ETHTOOL_A_COALESCE_TX_AGGR_MAX_FRAMES,
+            Self::TxAggrTimeUsecs(_) => ETHTOOL_A_COALESCE_TX_AGGR_TIME_USECS,
+            Self::RxProfile(_) => ETHTOOL_A_COALESCE_RX_PROFILE | NLA_F_NESTED,
+            Self::TxProfile(_) => ETHTOOL_A_COALESCE_TX_PROFILE | NLA_F_NESTED,
+            Self::RxCqeFrames(_) => ETHTOOL_A_COALESCE_RX_CQE_FRAMES,
+            Self::RxCqeNsecs(_) => ETHTOOL_A_COALESCE_RX_CQE_NSECS,
             Self::Other(attr) => attr.kind(),
         }
     }
@@ -142,9 +315,18 @@ impl Nla for EthtoolCoalesceAttr {
             | Self::RxMaxFramesHigh(d)
             | Self::TxUsecsHigh(d)
             | Self::TxMaxFramesHigh(d)
-            | Self::RateSampleInterval(d) => emit_u32(buffer, *d).unwrap(),
-            Self::UseAdaptiveRx(d) | Self::UseAdaptiveTx(d) => {
-                buffer[0] = (*d).into()
+            | Self::RateSampleInterval(d)
+            | Self::TxAggrMaxBytes(d)
+            | Self::TxAggrMaxFrames(d)
+            | Self::TxAggrTimeUsecs(d)
+            | Self::RxCqeFrames(d)
+            | Self::RxCqeNsecs(d) => emit_u32(buffer, *d).unwrap(),
+            Self::UseAdaptiveRx(d)
+            | Self::UseAdaptiveTx(d)
+            | Self::UseCqeModeTx(d)
+            | Self::UseCqeModeRx(d) => buffer[0] = (*d).into(),
+            Self::RxProfile(ref nlas) | Self::TxProfile(ref nlas) => {
+                nlas.as_slice().emit(buffer)
             }
         }
     }
@@ -290,6 +472,57 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     "Invalid ETHTOOL_A_COALESCE_RATE_SAMPLE_INTERVAL value",
                 )?)
             }
+
+            ETHTOOL_A_COALESCE_USE_CQE_MODE_TX => Self::UseCqeModeTx(
+                parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_USE_CQE_MODE_TX value",
+                )? == 1,
+            ),
+
+            ETHTOOL_A_COALESCE_USE_CQE_MODE_RX => Self::UseCqeModeRx(
+                parse_u8(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_USE_CQE_MODE_RX value",
+                )? == 1,
+            ),
+
+            ETHTOOL_A_COALESCE_TX_AGGR_MAX_BYTES => {
+                Self::TxAggrMaxBytes(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_AGGR_MAX_BYTES value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_TX_AGGR_MAX_FRAMES => {
+                Self::TxAggrMaxFrames(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_AGGR_MAX_FRAMES value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_TX_AGGR_TIME_USECS => {
+                Self::TxAggrTimeUsecs(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_TX_AGGR_TIME_USECS value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_RX_PROFILE => Self::RxProfile(
+                parse_profile_nlas(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_RX_PROFILE value")?,
+            ),
+
+            ETHTOOL_A_COALESCE_TX_PROFILE => Self::TxProfile(
+                parse_profile_nlas(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_TX_PROFILE value")?,
+            ),
+
+            ETHTOOL_A_COALESCE_RX_CQE_FRAMES => {
+                Self::RxCqeFrames(parse_u32(payload).context(
+                    "Invalid ETHTOOL_A_COALESCE_RX_CQE_FRAMES value",
+                )?)
+            }
+
+            ETHTOOL_A_COALESCE_RX_CQE_NSECS => Self::RxCqeNsecs(
+                parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_COALESCE_RX_CQE_NSECS value")?,
+            ),
 
             _ => Self::Other(
                 DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,

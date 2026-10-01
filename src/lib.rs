@@ -27,6 +27,7 @@ pub use channel::{
 };
 pub use coalesce::{
     EthtoolCoalesceAttr, EthtoolCoalesceGetRequest, EthtoolCoalesceHandle,
+    EthtoolCoalesceIrqModerationAttr, EthtoolCoalesceProfileAttr,
 };
 #[cfg(feature = "tokio_socket")]
 pub use connection::new_connection;
