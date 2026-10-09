@@ -91,7 +91,7 @@ impl Nla for EthtoolFeatureAttr {
             | Self::NoChange(feature_bits) => {
                 feature_bits_emit(feature_bits.as_slice(), buffer)
             }
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }

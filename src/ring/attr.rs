@@ -93,7 +93,7 @@ impl Nla for EthtoolRingAttr {
             | Self::Tx(d) => emit_u32(buffer, *d).unwrap(),
             Self::TcpDataSplit(d) => buffer[0] = *d,
             Self::TxPush(d) => buffer[0] = *d as u8,
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }

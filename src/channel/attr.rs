@@ -73,7 +73,7 @@ impl Nla for EthtoolChannelAttr {
             | Self::TxCount(d)
             | Self::OtherCount(d)
             | Self::CombinedCount(d) => emit_u32(buffer, *d).unwrap(),
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }
