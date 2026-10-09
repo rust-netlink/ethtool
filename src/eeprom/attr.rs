@@ -59,7 +59,7 @@ impl Nla for EthtoolModuleEEPROMAttr {
                 buffer[0] = *d
             }
             Self::Offset(d) | Self::Length(d) => emit_u32(buffer, *d).unwrap(),
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }

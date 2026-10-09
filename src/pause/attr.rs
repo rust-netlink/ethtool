@@ -108,7 +108,7 @@ impl Nla for EthtoolPauseAttr {
                 buffer[0] = *value as u8
             }
             Self::Stats(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
 }

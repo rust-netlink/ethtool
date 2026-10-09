@@ -64,7 +64,7 @@ impl Nla for EthtoolFecAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
             _ => todo!("Does not support changing ethtool fec yet"),
         }
     }
@@ -236,7 +236,7 @@ impl Nla for EthtoolFecStat {
             Self::Corrected(v)
             | Self::Uncorrected(v)
             | Self::CorrectBits(v) => emit_u64(buffer, *v).unwrap(),
-            Self::Other(attr) => attr.emit(buffer),
+            Self::Other(attr) => attr.emit_value(buffer),
         }
     }
 }

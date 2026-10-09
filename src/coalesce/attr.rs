@@ -295,7 +295,7 @@ impl Nla for EthtoolCoalesceAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit(buffer),
+            Self::Other(ref attr) => attr.emit_value(buffer),
             Self::RxUsecs(d)
             | Self::RxMaxFrames(d)
             | Self::RxUsecsIrq(d)
