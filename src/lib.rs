@@ -40,8 +40,7 @@ pub use eeprom::{
 };
 pub use error::EthtoolError;
 pub use feature::{
-    EthtoolFeatureAttr, EthtoolFeatureBit, EthtoolFeatureGetRequest,
-    EthtoolFeatureHandle,
+    EthtoolFeatureAttr, EthtoolFeatureGetRequest, EthtoolFeatureHandle,
 };
 pub use handle::EthtoolHandle;
 pub use header::EthtoolHeader;

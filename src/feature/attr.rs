@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-use log::warn;
 use netlink_packet_core::{
-    parse_string, parse_u32, DecodeError, DefaultNla, Emitable, ErrorContext,
-    Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    DecodeError, DefaultNla, Emitable, ErrorContext, Nla, NlaBuffer,
+    NlasIterator, Parseable, NLA_F_NESTED,
 };
 
-use crate::{EthtoolAttr, EthtoolHeader};
+use crate::{bitset::EthtoolBitset, EthtoolAttr, EthtoolHeader};
 
 const ETHTOOL_A_FEATURES_HEADER: u16 = 1;
 const ETHTOOL_A_FEATURES_HW: u16 = 2; // User changable features
@@ -14,46 +13,13 @@ const ETHTOOL_A_FEATURES_WANTED: u16 = 3; // User requested fatures
 const ETHTOOL_A_FEATURES_ACTIVE: u16 = 4; // Active features
 const ETHTOOL_A_FEATURES_NOCHANGE: u16 = 5;
 
-const ETHTOOL_A_BITSET_BITS: u16 = 3;
-
-const ETHTOOL_A_BITSET_BITS_BIT: u16 = 1;
-
-const ETHTOOL_A_BITSET_BIT_INDEX: u16 = 1;
-const ETHTOOL_A_BITSET_BIT_NAME: u16 = 2;
-const ETHTOOL_A_BITSET_BIT_VALUE: u16 = 3;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct EthtoolFeatureBit {
-    pub index: u32,
-    pub name: String,
-    pub value: bool,
-}
-
-impl EthtoolFeatureBit {
-    fn new(has_mask: bool) -> Self {
-        Self {
-            index: 0,
-            name: "".into(),
-            value: !has_mask,
-        }
-    }
-}
-
-fn feature_bits_len(_feature_bits: &[EthtoolFeatureBit]) -> usize {
-    todo!("Does not support changing ethtool feature yet")
-}
-
-fn feature_bits_emit(_feature_bits: &[EthtoolFeatureBit], _buffer: &mut [u8]) {
-    todo!("Does not support changing ethtool feature yet")
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EthtoolFeatureAttr {
     Header(Vec<EthtoolHeader>),
-    Hw(Vec<EthtoolFeatureBit>),
-    Wanted(Vec<EthtoolFeatureBit>),
-    Active(Vec<EthtoolFeatureBit>),
-    NoChange(Vec<EthtoolFeatureBit>),
+    Hw(EthtoolBitset),
+    Wanted(EthtoolBitset),
+    Active(EthtoolBitset),
+    NoChange(EthtoolBitset),
     Other(DefaultNla),
 }
 
@@ -61,12 +27,10 @@ impl Nla for EthtoolFeatureAttr {
     fn value_len(&self) -> usize {
         match self {
             Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::Hw(feature_bits)
-            | Self::Wanted(feature_bits)
-            | Self::Active(feature_bits)
-            | Self::NoChange(feature_bits) => {
-                feature_bits_len(feature_bits.as_slice())
-            }
+            Self::Hw(bitset)
+            | Self::Wanted(bitset)
+            | Self::Active(bitset)
+            | Self::NoChange(bitset) => bitset.buffer_len(),
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -85,12 +49,10 @@ impl Nla for EthtoolFeatureAttr {
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Hw(feature_bits)
-            | Self::Wanted(feature_bits)
-            | Self::Active(feature_bits)
-            | Self::NoChange(feature_bits) => {
-                feature_bits_emit(feature_bits.as_slice(), buffer)
-            }
+            Self::Hw(bitset)
+            | Self::Wanted(bitset)
+            | Self::Active(bitset)
+            | Self::NoChange(bitset) => bitset.emit(buffer),
             Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
@@ -113,28 +75,23 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 }
                 Self::Header(nlas)
             }
-            ETHTOOL_A_FEATURES_HW => {
-                Self::Hw(parse_bitset_bits_string_nlas(
-                    payload,
-                    true, /* ETHTOOL_A_FEATURES_HW is using mask */
-                )?)
-            }
+            ETHTOOL_A_FEATURES_HW => Self::Hw(
+                EthtoolBitset::parse(payload)
+                    .context("failed to parse ETHTOOL_A_FEATURES_HW bitset")?,
+            ),
             ETHTOOL_A_FEATURES_WANTED => {
-                Self::Wanted(parse_bitset_bits_string_nlas(
-                    payload,
-                    false, /* ETHTOOL_A_FEATURES_WANTED does not use mask */
+                Self::Wanted(EthtoolBitset::parse(payload).context(
+                    "failed to parse ETHTOOL_A_FEATURES_WANTED bitset",
                 )?)
             }
             ETHTOOL_A_FEATURES_ACTIVE => {
-                Self::Active(parse_bitset_bits_string_nlas(
-                    payload,
-                    false, /* ETHTOOL_A_FEATURES_ACTIVE does not use mask */
+                Self::Active(EthtoolBitset::parse(payload).context(
+                    "failed to parse ETHTOOL_A_FEATURES_ACTIVE bitset",
                 )?)
             }
             ETHTOOL_A_FEATURES_NOCHANGE => {
-                Self::NoChange(parse_bitset_bits_string_nlas(
-                    payload,
-                    false, /* ETHTOOL_A_FEATURES_NOCHANGE does not use mask */
+                Self::NoChange(EthtoolBitset::parse(payload).context(
+                    "failed to parse ETHTOOL_A_FEATURES_NOCHANGE bitset",
                 )?)
             }
             _ => Self::Other(
@@ -142,82 +99,6 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             ),
         })
     }
-}
-
-fn parse_bitset_bits_string_nlas(
-    raw: &[u8],
-    has_mask: bool,
-) -> Result<Vec<EthtoolFeatureBit>, DecodeError> {
-    let error_msg = "failed to parse feature bit sets";
-    for nla in NlasIterator::new(raw) {
-        let nla = &nla.context(error_msg)?;
-        if nla.kind() == ETHTOOL_A_BITSET_BITS {
-            return parse_bitset_bits_nla(nla.value(), has_mask);
-        }
-    }
-    Err("No ETHTOOL_A_BITSET_BITS NLA found".into())
-}
-
-fn parse_bitset_bits_nla(
-    raw: &[u8],
-    has_mask: bool,
-) -> Result<Vec<EthtoolFeatureBit>, DecodeError> {
-    let mut feature_bits = Vec::new();
-    let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS attributes";
-    for bit_nla in NlasIterator::new(raw) {
-        let bit_nla = &bit_nla.context(error_msg)?;
-        match bit_nla.kind() {
-            ETHTOOL_A_BITSET_BITS_BIT => {
-                let error_msg =
-                    "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
-                let nlas = NlasIterator::new(bit_nla.value());
-                let mut cur_bit_info = EthtoolFeatureBit::new(has_mask);
-                for nla in nlas {
-                    let nla = &nla.context(error_msg)?;
-                    let payload = nla.value();
-                    match nla.kind() {
-                        ETHTOOL_A_BITSET_BIT_INDEX => {
-                            if cur_bit_info.index != 0
-                                && !&cur_bit_info.name.is_empty()
-                            {
-                                feature_bits.push(cur_bit_info);
-                                cur_bit_info = EthtoolFeatureBit::new(has_mask);
-                            }
-                            cur_bit_info.index = parse_u32(payload).context(
-                                "Invald ETHTOOL_A_BITSET_BIT_INDEX value",
-                            )?;
-                        }
-                        ETHTOOL_A_BITSET_BIT_NAME => {
-                            cur_bit_info.name = parse_string(payload).context(
-                                "Invald ETHTOOL_A_BITSET_BIT_NAME value",
-                            )?;
-                        }
-                        ETHTOOL_A_BITSET_BIT_VALUE => {
-                            cur_bit_info.value = true;
-                        }
-                        _ => {
-                            warn!(
-                                "Unknown ETHTOOL_A_BITSET_BITS_BIT {} {:?}",
-                                nla.kind(),
-                                nla.value(),
-                            );
-                        }
-                    }
-                }
-                if cur_bit_info.index != 0 && !&cur_bit_info.name.is_empty() {
-                    feature_bits.push(cur_bit_info);
-                }
-            }
-            _ => {
-                warn!(
-                    "Unknown ETHTOOL_A_BITSET_BITS kind {}, {:?}",
-                    bit_nla.kind(),
-                    bit_nla.value()
-                );
-            }
-        };
-    }
-    Ok(feature_bits)
 }
 
 pub(crate) fn parse_feature_nlas(
