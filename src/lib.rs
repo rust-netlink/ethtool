@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 
+mod bitset;
 mod bitset_util;
 mod channel;
 mod coalesce;
@@ -21,6 +22,7 @@ pub use self::fec::{
     EthtoolFecAttr, EthtoolFecGetRequest, EthtoolFecHandle, EthtoolFecMode,
     EthtoolFecStat,
 };
+pub use bitset::{EthtoolBit, EthtoolBitset, EthtoolBitsetValue};
 pub use channel::{
     EthtoolChannelAttr, EthtoolChannelGetRequest, EthtoolChannelHandle,
     EthtoolChannelSetRequest,
