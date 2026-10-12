@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    parse_u32, DecodeError, DefaultNla, Emitable, ErrorContext, Nla, NlaBuffer,
-    NlasIterator, Parseable, NLA_F_NESTED,
+    emit_u32, parse_u32, DecodeError, DefaultNla, Emitable, ErrorContext, Nla,
+    NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
-use crate::{
-    bitset_util::parse_bitset_bits_string_nlas, EthtoolAttr, EthtoolHeader,
-};
+use crate::{bitset::EthtoolBitset, EthtoolAttr, EthtoolHeader};
 
 const ETHTOOL_A_TSINFO_HEADER: u16 = 1;
 const ETHTOOL_A_TSINFO_TIMESTAMPING: u16 = 2;
@@ -18,9 +16,9 @@ const ETHTOOL_A_TSINFO_PHC_INDEX: u16 = 5;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EthtoolTsInfoAttr {
     Header(Vec<EthtoolHeader>),
-    Timestamping(Vec<String>),
-    TxTypes(Vec<String>),
-    RxFilters(Vec<String>),
+    Timestamping(EthtoolBitset),
+    TxTypes(EthtoolBitset),
+    RxFilters(EthtoolBitset),
     PhcIndex(u32),
     Other(DefaultNla),
 }
@@ -29,10 +27,10 @@ impl Nla for EthtoolTsInfoAttr {
     fn value_len(&self) -> usize {
         match self {
             Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::Timestamping(_)
-            | Self::PhcIndex(_)
-            | Self::TxTypes(_)
-            | Self::RxFilters(_) => 4,
+            Self::Timestamping(bitset)
+            | Self::TxTypes(bitset)
+            | Self::RxFilters(bitset) => bitset.buffer_len(),
+            Self::PhcIndex(_) => 4,
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -40,9 +38,11 @@ impl Nla for EthtoolTsInfoAttr {
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_TSINFO_HEADER | NLA_F_NESTED,
-            Self::Timestamping(_) => ETHTOOL_A_TSINFO_TIMESTAMPING,
-            Self::TxTypes(_) => ETHTOOL_A_TSINFO_TX_TYPES,
-            Self::RxFilters(_) => ETHTOOL_A_TSINFO_RX_FILTERS,
+            Self::Timestamping(_) => {
+                ETHTOOL_A_TSINFO_TIMESTAMPING | NLA_F_NESTED
+            }
+            Self::TxTypes(_) => ETHTOOL_A_TSINFO_TX_TYPES | NLA_F_NESTED,
+            Self::RxFilters(_) => ETHTOOL_A_TSINFO_RX_FILTERS | NLA_F_NESTED,
             Self::PhcIndex(_) => ETHTOOL_A_TSINFO_PHC_INDEX,
             Self::Other(attr) => attr.kind(),
         }
@@ -52,7 +52,10 @@ impl Nla for EthtoolTsInfoAttr {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
             Self::Other(ref attr) => attr.emit_value(buffer),
-            _ => todo!("Does not support changing ethtool ts info yet"),
+            Self::Timestamping(bitset)
+            | Self::TxTypes(bitset)
+            | Self::RxFilters(bitset) => bitset.emit(buffer),
+            Self::PhcIndex(value) => emit_u32(buffer, *value).unwrap(),
         }
     }
 }
@@ -75,15 +78,15 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 Self::Header(nlas)
             }
             ETHTOOL_A_TSINFO_TIMESTAMPING => Self::Timestamping(
-                parse_bitset_bits_string_nlas(payload)
+                EthtoolBitset::parse(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_TIMESTAMPING value")?,
             ),
             ETHTOOL_A_TSINFO_TX_TYPES => Self::TxTypes(
-                parse_bitset_bits_string_nlas(payload)
+                EthtoolBitset::parse(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_TX_TYPES value")?,
             ),
             ETHTOOL_A_TSINFO_RX_FILTERS => Self::RxFilters(
-                parse_bitset_bits_string_nlas(payload)
+                EthtoolBitset::parse(payload)
                     .context("Invalid ETHTOOL_A_TSINFO_RX_FILTERS value")?,
             ),
             ETHTOOL_A_TSINFO_PHC_INDEX => Self::PhcIndex(

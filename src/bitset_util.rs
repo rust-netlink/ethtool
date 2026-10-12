@@ -33,24 +33,6 @@ pub(crate) fn parse_bitset_bits_nlas(
     Err("No ETHTOOL_A_BITSET_BITS NLA found".into())
 }
 
-pub(crate) fn parse_bitset_bits_string_nlas(
-    raw: &[u8],
-) -> Result<Vec<String>, DecodeError> {
-    let error_msg = "failed to parse mode bit sets";
-    for nla in NlasIterator::new(raw) {
-        let nla = &nla.context(error_msg)?;
-        if nla.kind() == ETHTOOL_A_BITSET_BITS {
-            let bits = parse_bitset_bits_nla(nla.value())?;
-
-            return Ok(bits
-                .into_iter()
-                .filter_map(|b| if b.value { Some(b.name) } else { None })
-                .collect::<Vec<String>>());
-        }
-    }
-    Err("No ETHTOOL_A_BITSET_BITS NLA found".into())
-}
-
 fn parse_bitset_bits_nla(
     raw: &[u8],
 ) -> Result<Vec<EthtoolBitSet>, DecodeError> {
