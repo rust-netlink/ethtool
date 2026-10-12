@@ -15,10 +15,10 @@ fn main() {
         .enable_io()
         .build()
         .unwrap();
-    rt.block_on(set_rx_count(link_name));
+    rt.block_on(set_channel_count(link_name));
 }
 
-async fn set_rx_count(iface_name: &str) {
+async fn set_channel_count(iface_name: &str) {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
@@ -32,15 +32,15 @@ async fn set_rx_count(iface_name: &str) {
 fn usage() {
     eprintln!(
         "usage:
-    cargo run --example set_rx_count -- <link name>
+    cargo run --example set_channel_count -- <link name>
 
 Note that you need to run this program as root. Instead of running cargo as root,
 build the example normally:
 
-    cd ethtool ; cargo build --example set_rx_count
+    cd ethtool ; cargo build --example set_channel_count
 
 Then find the binary in the target directory:
 
-    cd target/debug/example ; sudo ./set_rx_count <link_name>"
+    cd target/debug/examples ; sudo ./set_channel_count <link_name>"
     );
 }
