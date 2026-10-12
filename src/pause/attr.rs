@@ -34,7 +34,7 @@ impl Nla for EthtoolPauseStatAttr {
     fn kind(&self) -> u16 {
         match self {
             Self::Rx(_) => ETHTOOL_A_PAUSE_STAT_RX_FRAMES,
-            Self::Tx(_) => ETHTOOL_A_PAUSE_STAT_RX_FRAMES,
+            Self::Tx(_) => ETHTOOL_A_PAUSE_STAT_TX_FRAMES,
             Self::Other(attr) => attr.kind(),
         }
     }
