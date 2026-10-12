@@ -17,6 +17,9 @@ use crate::{
 };
 
 const ETHTOOL_MSG_PAUSE_GET: u8 = 21;
+/// The kernel uses the same numeric value for the `GET_REPLY` (kernel
+/// namespace) and the `SET` (user namespace) command.
+const ETHTOOL_MSG_PAUSE_SET: u8 = 22;
 const ETHTOOL_MSG_PAUSE_GET_REPLY: u8 = 22;
 const ETHTOOL_MSG_FEATURES_GET: u8 = 11;
 const ETHTOOL_MSG_FEATURES_GET_REPLY: u8 = 11;
@@ -40,6 +43,7 @@ const ETHTOOL_MSG_MODULE_EEPROM_GET_REPLY: u8 = 32;
 pub enum EthtoolCmd {
     PauseGet,
     PauseGetReply,
+    PauseSet,
     FeatureGet,
     FeatureGetReply,
     LinkModeGet,
@@ -64,6 +68,7 @@ impl From<EthtoolCmd> for u8 {
         match cmd {
             EthtoolCmd::PauseGet => ETHTOOL_MSG_PAUSE_GET,
             EthtoolCmd::PauseGetReply => ETHTOOL_MSG_PAUSE_GET_REPLY,
+            EthtoolCmd::PauseSet => ETHTOOL_MSG_PAUSE_SET,
             EthtoolCmd::FeatureGet => ETHTOOL_MSG_FEATURES_GET,
             EthtoolCmd::FeatureGetReply => ETHTOOL_MSG_FEATURES_GET_REPLY,
             EthtoolCmd::LinkModeGet => ETHTOOL_MSG_LINKMODES_GET,

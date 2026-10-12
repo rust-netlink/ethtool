@@ -54,7 +54,7 @@ pub use link_mode::{
 pub use message::{EthtoolAttr, EthtoolCmd, EthtoolMessage};
 pub use pause::{
     EthtoolPauseAttr, EthtoolPauseGetRequest, EthtoolPauseHandle,
-    EthtoolPauseStatAttr,
+    EthtoolPauseParsed, EthtoolPauseSetRequest, EthtoolPauseStatAttr,
 };
 pub use ring::{EthtoolRingAttr, EthtoolRingGetRequest, EthtoolRingHandle};
 pub use tsinfo::{
@@ -62,3 +62,8 @@ pub use tsinfo::{
 };
 
 pub(crate) use handle::ethtool_execute;
+
+// Compile the examples of the README as doc tests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

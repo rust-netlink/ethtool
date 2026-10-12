@@ -26,6 +26,8 @@
   virtio-net, veth and netdevsim do not report tx types/rx filters.
 - Non-empty `EthtoolLinkModeAttr::Ours`/`Peer` bitsets are not covered,
   none of the available virtual NICs reports supported link modes.
+- `EthtoolPauseStatAttr::TxPauseStormEvents` parse path is not covered,
+  netdevsim does not report pause storm events.
 
 ## API review
 
@@ -44,14 +46,30 @@
   `ETHTOOL_A_RINGS_TX_PUSH_BUF_LEN_MAX` (16),
   `ETHTOOL_A_RINGS_HDS_THRESH` (17),
   `ETHTOOL_A_RINGS_HDS_THRESH_MAX` (18).
-- `pause`: `ETHTOOL_A_PAUSE_STATS_SRC` (6) and
-  `ETHTOOL_A_PAUSE_STAT_TX_PAUSE_STORM_EVENTS` (4).
 - `tsinfo`: `ETHTOOL_A_TSINFO_HWTSTAMP_PROVIDER` (7),
   `ETHTOOL_A_TSINFO_HWTSTAMP_SOURCE` (8),
   `ETHTOOL_A_TSINFO_HWTSTAMP_PHYINDEX` (9).
 - `EthtoolModuleEEPROMAttr` only parses `HEADER` and `DATA`,
   `OFFSET`/`LENGTH`/`PAGE`/`BANK`/`I2C_ADDRESS` fall through to
   `DefaultNla` (they are only used in requests today).
+
+## apply support
+
+`pause` is the pilot for the parsed/apply design:
+
+- A get request executes into parsed types (`EthtoolPauseParsed`): the flat
+  `EthtoolHandle::get_pause()` takes a mandatory interface name and returns
+  one parsed configuration, `EthtoolHandle::dump_pause()` returns all of
+  them. `EthtoolHandle::apply_pause()` applies a parsed type back with a
+  set request. The old sub-handle request builders stay available.
+- `build()` of the parsed type emits only fields holding `Some` (the
+  kernel keeps the value of the others) and validates the input, failing
+  with `EthtoolError::InvalidInput`.
+- Roll out to the commands with kernel `*_SET` support not covered yet:
+  `link_mode` (`ADVERTISING`), `feature` (`WANTED`), `ring`, `coalesce`,
+  `fec` (`MODES`), `tsinfo`, EEE.
+- `EthtoolError` could hold `{kind, msg, netlink_msg}` like
+  `WireguardError` instead of the current enum.
 
 ## missing support
 

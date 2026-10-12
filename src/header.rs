@@ -7,7 +7,7 @@ use netlink_packet_core::{
     Nla, NlaBuffer, Parseable,
 };
 
-const ALTIFNAMSIZ: usize = 128;
+pub(crate) const ALTIFNAMSIZ: usize = 128;
 const ETHTOOL_A_HEADER_DEV_INDEX: u16 = 1;
 const ETHTOOL_A_HEADER_DEV_NAME: u16 = 2;
 const ETHTOOL_A_HEADER_FLAGS: u16 = 3;

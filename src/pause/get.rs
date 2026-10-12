@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::Stream;
-use netlink_packet_generic::GenlMessage;
+use futures_util::{Stream, StreamExt};
 
-use crate::{ethtool_execute, EthtoolError, EthtoolHandle, EthtoolMessage};
+use crate::{
+    ethtool_execute, EthtoolError, EthtoolHandle, EthtoolMessage,
+    EthtoolPauseParsed,
+};
 
 pub struct EthtoolPauseGetRequest {
     handle: EthtoolHandle,
@@ -18,10 +20,12 @@ impl EthtoolPauseGetRequest {
         }
     }
 
+    /// Retrieve the pause configuration of one interface, or of all
+    /// interfaces when no interface name was given.
     pub async fn execute(
         self,
     ) -> Result<
-        impl Stream<Item = Result<GenlMessage<EthtoolMessage>, EthtoolError>>,
+        impl Stream<Item = Result<EthtoolPauseParsed, EthtoolError>>,
         EthtoolError,
     > {
         let EthtoolPauseGetRequest {
@@ -30,6 +34,12 @@ impl EthtoolPauseGetRequest {
         } = self;
 
         let ethtool_msg = EthtoolMessage::new_pause_get(iface_name.as_deref());
-        ethtool_execute(&mut handle, iface_name.is_none(), ethtool_msg).await
+        let response =
+            ethtool_execute(&mut handle, iface_name.is_none(), ethtool_msg)
+                .await?;
+
+        Ok(response.map(|msg| {
+            msg.map(|genl_msg| EthtoolPauseParsed::from(genl_msg.payload))
+        }))
     }
 }
