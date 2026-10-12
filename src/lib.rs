@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
 mod bitset;
-mod bitset_util;
 mod channel;
 mod coalesce;
 mod connection;
