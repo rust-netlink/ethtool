@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    parse_u32, parse_u8, DecodeError, DefaultNla, Emitable, ErrorContext, Nla,
-    NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
-use crate::{
-    bitset_util::parse_bitset_bits_string_nlas, EthtoolAttr, EthtoolHeader,
-};
+use crate::{bitset::EthtoolBitset, EthtoolAttr, EthtoolHeader};
 
 const ETHTOOL_A_LINKMODES_HEADER: u16 = 1;
 const ETHTOOL_A_LINKMODES_AUTONEG: u16 = 2;
@@ -57,8 +55,8 @@ impl From<EthtoolLinkModeDuplex> for u8 {
 pub enum EthtoolLinkModeAttr {
     Header(Vec<EthtoolHeader>),
     Autoneg(bool),
-    Ours(Vec<String>),
-    Peer(Vec<String>),
+    Ours(EthtoolBitset),
+    Peer(EthtoolBitset),
     Speed(u32),
     Duplex(EthtoolLinkModeDuplex),
     ControllerSubordinateCfg(u8),
@@ -75,12 +73,7 @@ impl Nla for EthtoolLinkModeAttr {
             | Self::Duplex(_)
             | Self::ControllerSubordinateCfg(_)
             | Self::ControllerSubordinateState(_) => 1,
-            Self::Ours(_) => {
-                todo!("Does not support changing ethtool link mode yet")
-            }
-            Self::Peer(_) => {
-                todo!("Does not support changing ethtool link mode yet")
-            }
+            Self::Ours(bitset) | Self::Peer(bitset) => bitset.buffer_len(),
             Self::Speed(_) | Self::Lanes(_) => 4,
             Self::Other(attr) => attr.value_len(),
         }
@@ -90,8 +83,8 @@ impl Nla for EthtoolLinkModeAttr {
         match self {
             Self::Header(_) => ETHTOOL_A_LINKMODES_HEADER | NLA_F_NESTED,
             Self::Autoneg(_) => ETHTOOL_A_LINKMODES_AUTONEG,
-            Self::Ours(_) => ETHTOOL_A_LINKMODES_OURS,
-            Self::Peer(_) => ETHTOOL_A_LINKMODES_PEER,
+            Self::Ours(_) => ETHTOOL_A_LINKMODES_OURS | NLA_F_NESTED,
+            Self::Peer(_) => ETHTOOL_A_LINKMODES_PEER | NLA_F_NESTED,
             Self::Speed(_) => ETHTOOL_A_LINKMODES_SPEED,
             Self::Duplex(_) => ETHTOOL_A_LINKMODES_DUPLEX,
             Self::ControllerSubordinateCfg(_) => {
@@ -109,7 +102,14 @@ impl Nla for EthtoolLinkModeAttr {
         match self {
             Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
             Self::Other(ref attr) => attr.emit_value(buffer),
-            _ => todo!("Does not support changing ethtool link mode yet"),
+            Self::Autoneg(value) => buffer[0] = *value as u8,
+            Self::Duplex(value) => buffer[0] = u8::from(*value),
+            Self::ControllerSubordinateCfg(value)
+            | Self::ControllerSubordinateState(value) => buffer[0] = *value,
+            Self::Speed(value) | Self::Lanes(value) => {
+                emit_u32(buffer, *value).unwrap()
+            }
+            Self::Ours(bitset) | Self::Peer(bitset) => bitset.emit(buffer),
         }
     }
 }
@@ -137,12 +137,14 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     == 1,
             ),
 
-            ETHTOOL_A_LINKMODES_OURS => {
-                Self::Ours(parse_bitset_bits_string_nlas(payload)?)
-            }
-            ETHTOOL_A_LINKMODES_PEER => {
-                Self::Peer(parse_bitset_bits_string_nlas(payload)?)
-            }
+            ETHTOOL_A_LINKMODES_OURS => Self::Ours(
+                EthtoolBitset::parse(payload)
+                    .context("Invalid ETHTOOL_A_LINKMODES_OURS value")?,
+            ),
+            ETHTOOL_A_LINKMODES_PEER => Self::Peer(
+                EthtoolBitset::parse(payload)
+                    .context("Invalid ETHTOOL_A_LINKMODES_PEER value")?,
+            ),
             ETHTOOL_A_LINKMODES_SPEED => Self::Speed(
                 parse_u32(payload)
                     .context("Invalid ETHTOOL_A_LINKMODES_SPEED value")?,
