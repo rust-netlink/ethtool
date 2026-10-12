@@ -3,3 +3,4 @@ target
 vendor/
 tags
 *.swp
+AGENTS.md
