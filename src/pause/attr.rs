@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u64, parse_u64, parse_u8, DecodeError, DefaultNla, Emitable,
-    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    emit_u32, emit_u64, parse_u32, parse_u64, parse_u8, DecodeError,
+    DefaultNla, Emitable, ErrorContext, Nla, NlaBuffer, NlasIterator,
+    Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -12,21 +13,24 @@ const ETHTOOL_A_PAUSE_AUTONEG: u16 = 2;
 const ETHTOOL_A_PAUSE_RX: u16 = 3;
 const ETHTOOL_A_PAUSE_TX: u16 = 4;
 const ETHTOOL_A_PAUSE_STATS: u16 = 5;
+const ETHTOOL_A_PAUSE_STATS_SRC: u16 = 6;
 
 const ETHTOOL_A_PAUSE_STAT_TX_FRAMES: u16 = 2;
 const ETHTOOL_A_PAUSE_STAT_RX_FRAMES: u16 = 3;
+const ETHTOOL_A_PAUSE_STAT_TX_PAUSE_STORM_EVENTS: u16 = 4;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EthtoolPauseStatAttr {
     Rx(u64),
     Tx(u64),
+    TxPauseStormEvents(u64),
     Other(DefaultNla),
 }
 
 impl Nla for EthtoolPauseStatAttr {
     fn value_len(&self) -> usize {
         match self {
-            Self::Rx(_) | Self::Tx(_) => 8,
+            Self::Rx(_) | Self::Tx(_) | Self::TxPauseStormEvents(_) => 8,
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -35,13 +39,18 @@ impl Nla for EthtoolPauseStatAttr {
         match self {
             Self::Rx(_) => ETHTOOL_A_PAUSE_STAT_RX_FRAMES,
             Self::Tx(_) => ETHTOOL_A_PAUSE_STAT_TX_FRAMES,
+            Self::TxPauseStormEvents(_) => {
+                ETHTOOL_A_PAUSE_STAT_TX_PAUSE_STORM_EVENTS
+            }
             Self::Other(attr) => attr.kind(),
         }
     }
 
     fn emit_value(&self, buffer: &mut [u8]) {
         match self {
-            Self::Rx(value) | Self::Tx(value) => {
+            Self::Rx(value)
+            | Self::Tx(value)
+            | Self::TxPauseStormEvents(value) => {
                 emit_u64(buffer, *value).unwrap()
             }
             Self::Other(ref attr) => attr.emit_value(buffer),
@@ -63,6 +72,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u64(payload)
                     .context("invalid ETHTOOL_A_PAUSE_STAT_RX_FRAMES value")?,
             ),
+            ETHTOOL_A_PAUSE_STAT_TX_PAUSE_STORM_EVENTS => {
+                Self::TxPauseStormEvents(parse_u64(payload).context(
+                    "invalid ETHTOOL_A_PAUSE_STAT_TX_PAUSE_STORM_EVENTS value",
+                )?)
+            }
             _ => Self::Other(
                 DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
             ),
@@ -77,6 +91,7 @@ pub enum EthtoolPauseAttr {
     Rx(bool),
     Tx(bool),
     Stats(Vec<EthtoolPauseStatAttr>),
+    StatsSrc(u32),
     Other(DefaultNla),
 }
 
@@ -86,6 +101,7 @@ impl Nla for EthtoolPauseAttr {
             Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
             Self::AutoNeg(_) | Self::Rx(_) | Self::Tx(_) => 1,
             Self::Stats(ref nlas) => nlas.as_slice().buffer_len(),
+            Self::StatsSrc(_) => 4,
             Self::Other(attr) => attr.value_len(),
         }
     }
@@ -97,6 +113,7 @@ impl Nla for EthtoolPauseAttr {
             Self::Rx(_) => ETHTOOL_A_PAUSE_RX,
             Self::Tx(_) => ETHTOOL_A_PAUSE_TX,
             Self::Stats(_) => ETHTOOL_A_PAUSE_STATS | NLA_F_NESTED,
+            Self::StatsSrc(_) => ETHTOOL_A_PAUSE_STATS_SRC,
             Self::Other(attr) => attr.kind(),
         }
     }
@@ -108,6 +125,7 @@ impl Nla for EthtoolPauseAttr {
                 buffer[0] = *value as u8
             }
             Self::Stats(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::StatsSrc(value) => emit_u32(buffer, *value).unwrap(),
             Self::Other(ref attr) => attr.emit_value(buffer),
         }
     }
@@ -156,6 +174,10 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 }
                 Self::Stats(nlas)
             }
+            ETHTOOL_A_PAUSE_STATS_SRC => Self::StatsSrc(
+                parse_u32(payload)
+                    .context("invalid ETHTOOL_A_PAUSE_STATS_SRC value")?,
+            ),
             _ => Self::Other(
                 DefaultNla::parse(buf).context("invalid NLA (unknown kind)")?,
             ),

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-use futures_util::stream::StreamExt;
+use std::env;
 
 // Once we find a way to load netsimdev kernel module in CI, we can convert this
 // to a test
@@ -10,20 +10,22 @@ fn main() {
         .enable_io()
         .build()
         .unwrap();
-    rt.block_on(get_pause(None));
+    rt.block_on(run());
 }
 
-async fn get_pause(iface_name: Option<&str>) {
+async fn run() {
     let (connection, mut handle, _) = ethtool::new_connection().unwrap();
     tokio::spawn(connection);
 
-    let mut pause_handle =
-        handle.pause().get(iface_name).execute().await.unwrap();
-
-    let mut msgs = Vec::new();
-    while let Some(Ok(msg)) = pause_handle.next().await {
-        msgs.push(msg);
+    match env::args().nth(1) {
+        Some(iface_name) => {
+            let config = handle.get_pause(&iface_name).await.unwrap();
+            println!("{config:?}");
+        }
+        None => {
+            for config in handle.dump_pause().await.unwrap() {
+                println!("{config:?}");
+            }
+        }
     }
-    assert!(!msgs.is_empty());
-    println!("{msgs:?}");
 }

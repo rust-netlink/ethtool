@@ -37,5 +37,9 @@ tokio = { version = "1.44.0", features = ["macros", "rt", "rt-multi-thread"] }
 env_logger = "0.9.3"
 
 [[example]]
-name = "query_pause_conf"
+name = "get_pause_conf"
+required-features = ["tokio_socket"]
+
+[[example]]
+name = "apply_pause_conf"
 required-features = ["tokio_socket"]
