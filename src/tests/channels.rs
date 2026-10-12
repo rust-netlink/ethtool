@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-use ethtool::{
+use super::parse_and_round_trip;
+use crate::{
     EthtoolAttr, EthtoolChannelAttr, EthtoolCmd, EthtoolHeader, EthtoolMessage,
 };
 use netlink_packet_core::{Emitable, ParseableParametrized};
@@ -130,4 +131,62 @@ fn test_channels_set_combined() {
     msg.emit(&mut raw);
 
     assert_eq!(expected, raw,);
+}
+#[test]
+fn test_parsing_channels_netdevsim() {
+    let raw: Vec<u8> = vec![
+        0x12, 0x01, 0x00, 0x00, 0x18, 0x00, 0x01, 0x80, 0x08, 0x00, 0x01, 0x00,
+        0xa3, 0x00, 0x00, 0x00, 0x09, 0x00, 0x02, 0x00, 0x73, 0x69, 0x6d, 0x30,
+        0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x08, 0x00, 0x09, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ];
+
+    // ethtool -l sim0 after ethtool -L sim0 combined 1
+    let msg = parse_and_round_trip(&raw);
+
+    assert_eq!(
+        msg,
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelGetReply,
+            nlas: vec![
+                EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                    EthtoolHeader::DevIndex(163),
+                    EthtoolHeader::DevName("sim0".to_string()),
+                ])),
+                EthtoolAttr::Channel(EthtoolChannelAttr::CombinedMax(1)),
+                EthtoolAttr::Channel(EthtoolChannelAttr::CombinedCount(1)),
+            ],
+        }
+    );
+}
+
+#[test]
+fn test_parsing_channels_veth() {
+    let raw: Vec<u8> = vec![
+        0x12, 0x01, 0x00, 0x00, 0x18, 0x00, 0x01, 0x80, 0x08, 0x00, 0x01, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x0a, 0x00, 0x02, 0x00, 0x76, 0x65, 0x74, 0x68,
+        0x30, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 0x00, 0x10, 0x00, 0x00, 0x00,
+        0x08, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x03, 0x00,
+        0x10, 0x00, 0x00, 0x00, 0x08, 0x00, 0x07, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ];
+
+    // ethtool -l veth0
+    let msg = parse_and_round_trip(&raw);
+
+    assert_eq!(
+        msg,
+        EthtoolMessage {
+            cmd: EthtoolCmd::ChannelGetReply,
+            nlas: vec![
+                EthtoolAttr::Channel(EthtoolChannelAttr::Header(vec![
+                    EthtoolHeader::DevIndex(256),
+                    EthtoolHeader::DevName("veth0".to_string()),
+                ])),
+                EthtoolAttr::Channel(EthtoolChannelAttr::RxMax(16)),
+                EthtoolAttr::Channel(EthtoolChannelAttr::RxCount(1)),
+                EthtoolAttr::Channel(EthtoolChannelAttr::TxMax(16)),
+                EthtoolAttr::Channel(EthtoolChannelAttr::TxCount(1)),
+            ],
+        }
+    );
 }

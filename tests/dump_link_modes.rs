@@ -26,7 +26,7 @@ async fn dump_link_modes() {
     }
     assert!(!msgs.is_empty());
     let ethtool_msg = &msgs[0].payload;
-    println!("ethtool_msg {:?}", &ethtool_msg);
+    println!("ethtool_msg {ethtool_msg:?}");
 
     assert!(ethtool_msg.cmd == ethtool::EthtoolCmd::LinkModeGetReply);
     assert!(ethtool_msg.nlas.len() > 1);
