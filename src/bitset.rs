@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-use netlink_packet_core::{emit_u32, Emitable, Nla, NLA_F_NESTED};
+use log::warn;
+use netlink_packet_core::{
+    emit_u32, parse_string, parse_u32, DecodeError, Emitable, ErrorContext,
+    Nla, NlasIterator, NLA_F_NESTED,
+};
 
 const ETHTOOL_A_BITSET_NOMASK: u16 = 1;
 const ETHTOOL_A_BITSET_SIZE: u16 = 2;
@@ -38,6 +42,134 @@ pub struct EthtoolBitset {
     /// Number of bits in this bitset (`ETHTOOL_A_BITSET_SIZE`).
     pub size: u32,
     pub value: EthtoolBitsetValue,
+}
+
+impl EthtoolBitset {
+    pub(crate) fn parse(payload: &[u8]) -> Result<Self, DecodeError> {
+        let mut nomask = false;
+        let mut size = 0u32;
+        let mut bits = None;
+        let mut value = None;
+        let mut mask = None;
+        let error_msg = "failed to parse bitset attributes";
+        for nla in NlasIterator::new(payload) {
+            let nla = &nla.context(error_msg)?;
+            match nla.kind() {
+                ETHTOOL_A_BITSET_NOMASK => nomask = true,
+                ETHTOOL_A_BITSET_SIZE => {
+                    size = parse_u32(nla.value())
+                        .context("Invalid ETHTOOL_A_BITSET_SIZE value")?
+                }
+                ETHTOOL_A_BITSET_BITS => {
+                    bits = Some(parse_bits(nla.value())?);
+                }
+                ETHTOOL_A_BITSET_VALUE => {
+                    value = Some(parse_u32_words(nla.value())?);
+                }
+                ETHTOOL_A_BITSET_MASK => {
+                    mask = Some(parse_u32_words(nla.value())?);
+                }
+                kind => {
+                    warn!(
+                        "Unknown ETHTOOL_A_BITSET_* attribute {kind} {:?}",
+                        nla.value()
+                    );
+                }
+            }
+        }
+        let value = match (bits, value) {
+            (Some(mut bits), _) => {
+                if nomask {
+                    // For bitsets without mask, only set bits are listed,
+                    // hence any listed bit is enabled.
+                    for bit in bits.iter_mut() {
+                        bit.value = true;
+                    }
+                }
+                EthtoolBitsetValue::Bits(bits)
+            }
+            (None, Some(value)) => EthtoolBitsetValue::Compact {
+                value,
+                mask: mask.unwrap_or_default(),
+            },
+            (None, None) => {
+                return Err("Invalid bitset: neither BITS nor VALUE".into())
+            }
+        };
+        Ok(Self {
+            nomask,
+            size,
+            value,
+        })
+    }
+}
+
+fn parse_bits(raw: &[u8]) -> Result<Vec<EthtoolBit>, DecodeError> {
+    let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS attributes";
+    let mut bits = Vec::new();
+    for bit_nla in NlasIterator::new(raw) {
+        let bit_nla = &bit_nla.context(error_msg)?;
+        match bit_nla.kind() {
+            ETHTOOL_A_BITSET_BITS_BIT => {
+                bits.push(parse_bit(bit_nla.value())?);
+            }
+            kind => {
+                warn!(
+                    "Unknown ETHTOOL_A_BITSET_BITS attribute {kind} {:?}",
+                    bit_nla.value()
+                );
+            }
+        }
+    }
+    Ok(bits)
+}
+
+fn parse_bit(raw: &[u8]) -> Result<EthtoolBit, DecodeError> {
+    let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
+    let mut bit = EthtoolBit::default();
+    let mut index_found = false;
+    for nla in NlasIterator::new(raw) {
+        let nla = &nla.context(error_msg)?;
+        let payload = nla.value();
+        match nla.kind() {
+            ETHTOOL_A_BITSET_BIT_INDEX => {
+                bit.index = parse_u32(payload)
+                    .context("Invalid ETHTOOL_A_BITSET_BIT_INDEX value")?;
+                index_found = true;
+            }
+            ETHTOOL_A_BITSET_BIT_NAME => {
+                bit.name = parse_string(payload)
+                    .context("Invalid ETHTOOL_A_BITSET_BIT_NAME value")?;
+            }
+            ETHTOOL_A_BITSET_BIT_VALUE => bit.value = true,
+            kind => {
+                warn!(
+                    "Unknown ETHTOOL_A_BITSET_BITS_BIT attribute {kind} {:?}",
+                    nla.value()
+                );
+            }
+        }
+    }
+    if !index_found {
+        return Err("Missing ETHTOOL_A_BITSET_BIT_INDEX".into());
+    }
+    Ok(bit)
+}
+
+fn parse_u32_words(raw: &[u8]) -> Result<Vec<u32>, DecodeError> {
+    if !raw.len().is_multiple_of(4) {
+        return Err(format!(
+            "Invalid bitmap length {}, not multiple of 4",
+            raw.len()
+        )
+        .into());
+    }
+    Ok(raw
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|w| u32::from_ne_bytes(*w))
+        .collect())
 }
 
 const fn align4(len: usize) -> usize {
