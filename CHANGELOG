@@ -1,4 +1,27 @@
 # Changelog
+## [0.4.0] - 2026-11-04
+### Breaking changes
+ - N/A
+
+### New features
+ - pause: add parsed configuration and set support. (a60f235)
+ - Introduce EthtoolBitset. (e597991)
+ - coalesce: Add missing attributes. (a38be5a)
+
+### Bug fixes
+ - Use netlink-proto 0.14.1. (ac293ab)
+ - cargo: use sudo to run integration tests. (8c3e077)
+ - tests: add per-subsystem integration tests. (00eda7a)
+ - examples: one query example per subsystem and list them in README. (f5cdc39)
+ - Add captured packet tests for all supported commands. (f8d34b9)
+ - pause: fix Tx stat attribute id. (c97c35d)
+ - fec: use EthtoolBitset and fix stats parsing. (6004c09)
+ - tsinfo: use EthtoolBitset and fix nested bitset emitting. (815706a)
+ - link_mode: use EthtoolBitset and fix nested bitset emitting. (2c05e44)
+ - feature: use EthtoolBitset for feature bitsets. (c9b949f)
+ - Fix emitting of unknown/other attributes. (a64e220)
+ - LICENSE: fix LICENSE-MIT. (2c103d0)
+
 ## [0.3.0] - 2026-08-18
 ### Breaking changes
  - Use latest rust-netlink crates. (7f6f09d)
