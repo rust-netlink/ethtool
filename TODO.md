@@ -65,9 +65,11 @@
 - `build()` of the parsed type emits only fields holding `Some` (the
   kernel keeps the value of the others) and validates the input, failing
   with `EthtoolError::InvalidInput`.
+- `ring` follows the design (`EthtoolRingParsed`). `feature` has a set
+  request builder addressing features by name, a parsed type is still
+  missing.
 - Roll out to the commands with kernel `*_SET` support not covered yet:
-  `link_mode` (`ADVERTISING`), `feature` (`WANTED`), `ring`, `coalesce`,
-  `fec` (`MODES`), `tsinfo`, EEE.
+  `link_mode` (`ADVERTISING`), `coalesce`, `fec` (`MODES`), `tsinfo`, EEE.
 - `EthtoolError` could hold `{kind, msg, netlink_msg}` like
   `WireguardError` instead of the current enum.
 

@@ -25,6 +25,8 @@ sudo ./target/debug/examples/get_pause_conf
 ## Set
 
 - [apply pause configuration](examples/apply_pause_conf.rs)
+- [apply ring configuration](examples/apply_ring_conf.rs)
+- [set features](examples/set_features.rs)
 - [set channel count](examples/set_channel_count.rs)
 
 ## Notes
@@ -44,6 +46,13 @@ sudo ./target/debug/examples/get_pause_conf
   its current value.
 - The statistics properties of `EthtoolPauseParsed` are read-only, the
   kernel rejects them in a set request, therefore they are not sent.
-- `apply_pause_conf` shows how a queried configuration is modified and
-  applied back, `set_channel_count` uses the builder of the channel set
-  request.
+- The ring parameters follow the same design: `EthtoolHandle::get_ring()`,
+  `EthtoolHandle::dump_ring()` and `EthtoolHandle::apply_ring()` work on
+  `EthtoolRingParsed`, whose maximum ring sizes are read-only.
+- `handle.feature().set(...)` changes features by the name `ethtool -k`
+  shows. It queries the changeable features first and fails for a name the
+  interface can not change, then returns the requested features the driver
+  did not apply.
+- `apply_pause_conf` and `apply_ring_conf` show how a queried configuration
+  is modified and applied back, `set_channel_count` and `set_features` use
+  the builders of the channel and feature set requests.

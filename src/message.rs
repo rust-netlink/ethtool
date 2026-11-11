@@ -23,10 +23,13 @@ const ETHTOOL_MSG_PAUSE_SET: u8 = 22;
 const ETHTOOL_MSG_PAUSE_GET_REPLY: u8 = 22;
 const ETHTOOL_MSG_FEATURES_GET: u8 = 11;
 const ETHTOOL_MSG_FEATURES_GET_REPLY: u8 = 11;
+const ETHTOOL_MSG_FEATURES_SET: u8 = 12;
+const ETHTOOL_MSG_FEATURES_SET_REPLY: u8 = 12;
 const ETHTOOL_MSG_LINKMODES_GET: u8 = 4;
 const ETHTOOL_MSG_LINKMODES_GET_REPLY: u8 = 4;
 const ETHTOOL_MSG_RINGS_GET: u8 = 15;
 const ETHTOOL_MSG_RINGS_GET_REPLY: u8 = 16;
+const ETHTOOL_MSG_RINGS_SET: u8 = 16;
 const ETHTOOL_MSG_COALESCE_GET: u8 = 19;
 const ETHTOOL_MSG_COALESCE_GET_REPLY: u8 = 20;
 const ETHTOOL_MSG_TSINFO_GET: u8 = 25;
@@ -46,10 +49,13 @@ pub enum EthtoolCmd {
     PauseSet,
     FeatureGet,
     FeatureGetReply,
+    FeatureSet,
+    FeatureSetReply,
     LinkModeGet,
     LinkModeGetReply,
     RingGet,
     RingGetReply,
+    RingSet,
     CoalesceGet,
     CoalesceGetReply,
     TsInfoGet,
@@ -71,10 +77,13 @@ impl From<EthtoolCmd> for u8 {
             EthtoolCmd::PauseSet => ETHTOOL_MSG_PAUSE_SET,
             EthtoolCmd::FeatureGet => ETHTOOL_MSG_FEATURES_GET,
             EthtoolCmd::FeatureGetReply => ETHTOOL_MSG_FEATURES_GET_REPLY,
+            EthtoolCmd::FeatureSet => ETHTOOL_MSG_FEATURES_SET,
+            EthtoolCmd::FeatureSetReply => ETHTOOL_MSG_FEATURES_SET_REPLY,
             EthtoolCmd::LinkModeGet => ETHTOOL_MSG_LINKMODES_GET,
             EthtoolCmd::LinkModeGetReply => ETHTOOL_MSG_LINKMODES_GET_REPLY,
             EthtoolCmd::RingGet => ETHTOOL_MSG_RINGS_GET,
             EthtoolCmd::RingGetReply => ETHTOOL_MSG_RINGS_GET_REPLY,
+            EthtoolCmd::RingSet => ETHTOOL_MSG_RINGS_SET,
             EthtoolCmd::CoalesceGet => ETHTOOL_MSG_COALESCE_GET,
             EthtoolCmd::CoalesceGetReply => ETHTOOL_MSG_COALESCE_GET_REPLY,
             EthtoolCmd::TsInfoGet => ETHTOOL_MSG_TSINFO_GET,
@@ -378,6 +387,10 @@ impl ParseableParametrized<[u8], GenlHeader> for EthtoolMessage {
             },
             ETHTOOL_MSG_FEATURES_GET_REPLY => Self {
                 cmd: EthtoolCmd::FeatureGetReply,
+                nlas: parse_feature_nlas(buffer)?,
+            },
+            ETHTOOL_MSG_FEATURES_SET_REPLY => Self {
+                cmd: EthtoolCmd::FeatureSetReply,
                 nlas: parse_feature_nlas(buffer)?,
             },
             ETHTOOL_MSG_LINKMODES_GET_REPLY => Self {

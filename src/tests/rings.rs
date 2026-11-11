@@ -11,9 +11,11 @@
 
 use super::parse_and_round_trip;
 use crate::{
-    EthtoolAttr, EthtoolCmd, EthtoolHeader, EthtoolMessage, EthtoolRingAttr,
+    ring::parse_ring_nlas, EthtoolAttr, EthtoolCmd, EthtoolHeader,
+    EthtoolMessage, EthtoolRingAttr, EthtoolRingParsed, EthtoolTcpDataSplit,
 };
-use netlink_packet_core::DefaultNla;
+use netlink_packet_core::{DefaultNla, Emitable};
+use netlink_packet_generic::GenlHeader;
 
 #[test]
 fn test_parsing_rings_netdevsim() {
@@ -70,6 +72,66 @@ fn test_parsing_rings_netdevsim() {
                 ))),
             ],
         }
+    );
+
+    let parsed = EthtoolRingParsed::from(msg);
+
+    assert_eq!(
+        parsed,
+        EthtoolRingParsed {
+            iface_name: Some("sim0".to_string()),
+            iface_index: Some(163),
+            rx_max: Some(4096),
+            rx_mini_max: Some(4096),
+            rx_jumbo_max: Some(4096),
+            tx_max: Some(4096),
+            rx: Some(512),
+            rx_mini: Some(8),
+            rx_jumbo: Some(16),
+            tx: Some(512),
+            tcp_data_split: Some(EthtoolTcpDataSplit::Enabled),
+            tx_push: Some(false),
+            ..Default::default()
+        }
+    );
+}
+
+#[test]
+fn test_building_rings_set_virtio() {
+    // Request of `ethtool -G eth0 rx 256 tcp-data-split on` on virtio-net,
+    // captured with strace on Linux 6.18 (the kernel refuses it with
+    // EOPNOTSUPP, virtio-net has no header/data split). The 16 bytes
+    // netlink header is stripped.
+    let raw_request: Vec<u8> = vec![
+        0x10, 0x01, 0x00, 0x00, 0x10, 0x00, 0x01, 0x80, 0x09, 0x00, 0x02, 0x00,
+        0x65, 0x74, 0x68, 0x30, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x06, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x0b, 0x00, 0x02, 0x00, 0x00, 0x00,
+    ];
+
+    let config = EthtoolRingParsed {
+        iface_name: Some("eth0".to_string()),
+        iface_index: Some(2),
+        rx_max: Some(256),
+        tx_max: Some(256),
+        rx: Some(256),
+        tcp_data_split: Some(EthtoolTcpDataSplit::Enabled),
+        ..Default::default()
+    };
+    let msg = config.build().unwrap();
+    let header = GenlHeader {
+        cmd: EthtoolCmd::RingSet.into(),
+        version: 1,
+    };
+    let mut buffer = vec![0; header.buffer_len() + msg.buffer_len()];
+    header.emit(&mut buffer);
+    msg.emit(&mut buffer[header.buffer_len()..]);
+
+    assert_eq!(buffer, raw_request);
+
+    // The request parses back into the attributes it was built from.
+    assert_eq!(
+        parse_ring_nlas(&raw_request[header.buffer_len()..]).unwrap(),
+        msg.nlas
     );
 }
 
