@@ -43,3 +43,11 @@ required-features = ["tokio_socket"]
 [[example]]
 name = "apply_pause_conf"
 required-features = ["tokio_socket"]
+
+[[example]]
+name = "apply_ring_conf"
+required-features = ["tokio_socket"]
+
+[[example]]
+name = "set_features"
+required-features = ["tokio_socket"]

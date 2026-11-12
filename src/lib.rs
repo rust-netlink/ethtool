@@ -44,6 +44,7 @@ pub use eeprom::{
 pub use error::EthtoolError;
 pub use feature::{
     EthtoolFeatureAttr, EthtoolFeatureGetRequest, EthtoolFeatureHandle,
+    EthtoolFeatureSetRequest,
 };
 pub use handle::EthtoolHandle;
 pub use header::EthtoolHeader;
@@ -56,7 +57,10 @@ pub use pause::{
     EthtoolPauseAttr, EthtoolPauseGetRequest, EthtoolPauseHandle,
     EthtoolPauseParsed, EthtoolPauseSetRequest, EthtoolPauseStatAttr,
 };
-pub use ring::{EthtoolRingAttr, EthtoolRingGetRequest, EthtoolRingHandle};
+pub use ring::{
+    EthtoolRingAttr, EthtoolRingGetRequest, EthtoolRingHandle,
+    EthtoolRingParsed, EthtoolRingSetRequest, EthtoolTcpDataSplit,
+};
 pub use tsinfo::{
     EthtoolTsInfoAttr, EthtoolTsInfoGetRequest, EthtoolTsInfoHandle,
 };

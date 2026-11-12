@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-//! Query test for the ring subsystem.
+//! Query and set tests for the ring subsystem.
 //!
 //! The loopback interface does not support rings, netdevsim is required.
 //! See [common::netdevsim_iface] for how to instantiate one, the test skips
@@ -8,7 +8,10 @@
 
 mod common;
 
-use ethtool::{EthtoolAttr, EthtoolCmd, EthtoolHeader, EthtoolRingAttr};
+use ethtool::{
+    EthtoolAttr, EthtoolCmd, EthtoolHeader, EthtoolRingAttr, EthtoolRingParsed,
+    EthtoolTcpDataSplit,
+};
 use futures_util::stream::StreamExt;
 
 #[tokio::test]
@@ -43,4 +46,38 @@ async fn query_rings_netdevsim() {
         }
         nla => panic!("unexpected first ring attribute {nla:?}"),
     }
+}
+
+#[tokio::test]
+async fn set_ring_netdevsim() {
+    let Some(iface_name) = common::netdevsim_iface() else {
+        eprintln!("skipped set_ring_netdevsim: netdevsim is not available");
+        return;
+    };
+
+    let mut handle = common::connect().await;
+    let current = handle
+        .get_ring(&iface_name)
+        .await
+        .expect("failed to request the ring parameters");
+    assert_eq!(current.iface_name.as_deref(), Some(iface_name.as_str()));
+
+    let mut config = EthtoolRingParsed::default();
+    config.iface_name = Some(iface_name.clone());
+    config.rx = Some(256);
+    config.tcp_data_split = Some(EthtoolTcpDataSplit::Enabled);
+    if let Err(err) = handle.apply_ring(config).await {
+        if common::is_skippable(&err) {
+            eprintln!("skipped set_ring_netdevsim: {err}");
+            return;
+        }
+        panic!("failed to apply the ring parameters: {err}");
+    }
+
+    let config = handle
+        .get_ring(&iface_name)
+        .await
+        .expect("failed to request the ring parameters");
+    assert_eq!(config.rx, Some(256));
+    assert_eq!(config.tcp_data_split, Some(EthtoolTcpDataSplit::Enabled));
 }

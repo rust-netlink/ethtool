@@ -11,9 +11,12 @@
 
 use super::parse_and_round_trip;
 use crate::{
+    feature::{build_feature_set, feature_set_unapplied},
     EthtoolAttr, EthtoolBit, EthtoolBitset, EthtoolBitsetValue, EthtoolCmd,
-    EthtoolFeatureAttr, EthtoolHeader,
+    EthtoolError, EthtoolFeatureAttr, EthtoolHeader, EthtoolMessage,
 };
+use netlink_packet_core::Emitable;
+use netlink_packet_generic::GenlHeader;
 
 #[test]
 fn test_parsing_features_compact_bitsets() {
@@ -462,4 +465,115 @@ fn test_parsing_features_string_bitsets() {
             value: true,
         }])
     );
+}
+
+/// `tx-nocache-copy` (bit 41) as the `ETHTOOL_A_FEATURES_HW` bitset of a
+/// dummy interface lists it: changeable, with the other bits left out.
+fn changeable_nocache_copy() -> EthtoolBitset {
+    EthtoolBitset {
+        nomask: false,
+        size: 64,
+        value: EthtoolBitsetValue::Bits(vec![EthtoolBit {
+            index: 41,
+            name: "tx-nocache-copy".to_string(),
+            value: true,
+        }]),
+    }
+}
+
+#[test]
+fn test_building_features_set_dummy() {
+    // Request turning `tx-nocache-copy` on for a dummy interface, captured
+    // with strace on Linux 6.18, which the kernel applied. The 16 bytes
+    // netlink header is stripped.
+    let raw_request: Vec<u8> = vec![
+        0x0c, 0x01, 0x00, 0x00, 0x10, 0x00, 0x01, 0x80, 0x0b, 0x00, 0x02, 0x00,
+        0x64, 0x75, 0x6d, 0x6d, 0x79, 0x30, 0x00, 0x00, 0x34, 0x00, 0x03, 0x80,
+        0x08, 0x00, 0x02, 0x00, 0x40, 0x00, 0x00, 0x00, 0x28, 0x00, 0x03, 0x80,
+        0x24, 0x00, 0x01, 0x80, 0x08, 0x00, 0x01, 0x00, 0x29, 0x00, 0x00, 0x00,
+        0x14, 0x00, 0x02, 0x00, 0x74, 0x78, 0x2d, 0x6e, 0x6f, 0x63, 0x61, 0x63,
+        0x68, 0x65, 0x2d, 0x63, 0x6f, 0x70, 0x79, 0x00, 0x04, 0x00, 0x03, 0x00,
+    ];
+
+    let msg = build_feature_set(
+        "dummy0",
+        &changeable_nocache_copy(),
+        &[("tx-nocache-copy".to_string(), true)],
+    )
+    .unwrap();
+    let header = GenlHeader {
+        cmd: EthtoolCmd::FeatureSet.into(),
+        version: 1,
+    };
+    let mut buffer = vec![0; header.buffer_len() + msg.buffer_len()];
+    header.emit(&mut buffer);
+    msg.emit(&mut buffer[header.buffer_len()..]);
+
+    assert_eq!(buffer, raw_request);
+}
+
+#[test]
+fn test_building_features_set_refuses_unchangeable_features() {
+    let hw = changeable_nocache_copy();
+
+    for name in ["tls-hw-tx-offload", ""] {
+        let err = build_feature_set("dummy0", &hw, &[(name.to_string(), true)])
+            .unwrap_err();
+        assert!(matches!(err, EthtoolError::InvalidInput(_)), "{err:?}");
+    }
+
+    let mut fixed = hw.clone();
+    if let EthtoolBitsetValue::Bits(bits) = &mut fixed.value {
+        bits[0].value = false;
+    }
+    let err = build_feature_set(
+        "dummy0",
+        &fixed,
+        &[("tx-nocache-copy".to_string(), true)],
+    )
+    .unwrap_err();
+    assert!(matches!(err, EthtoolError::InvalidInput(_)), "{err:?}");
+}
+
+#[test]
+fn test_parsing_features_set_reply_dummy() {
+    // Kernel reply to the request of `test_building_features_set_dummy`,
+    // captured with strace on Linux 6.18: nothing of the request is left
+    // unapplied (empty `WANTED`) and `tx-nocache-copy` became active.
+    let raw: Vec<u8> = vec![
+        0x0c, 0x01, 0x00, 0x00, 0x18, 0x00, 0x01, 0x80, 0x08, 0x00, 0x01, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x02, 0x00, 0x64, 0x75, 0x6d, 0x6d,
+        0x79, 0x30, 0x00, 0x00, 0x10, 0x00, 0x03, 0x80, 0x08, 0x00, 0x02, 0x00,
+        0x40, 0x00, 0x00, 0x00, 0x04, 0x00, 0x03, 0x80, 0x34, 0x00, 0x04, 0x80,
+        0x08, 0x00, 0x02, 0x00, 0x40, 0x00, 0x00, 0x00, 0x28, 0x00, 0x03, 0x80,
+        0x24, 0x00, 0x01, 0x80, 0x08, 0x00, 0x01, 0x00, 0x29, 0x00, 0x00, 0x00,
+        0x14, 0x00, 0x02, 0x00, 0x74, 0x78, 0x2d, 0x6e, 0x6f, 0x63, 0x61, 0x63,
+        0x68, 0x65, 0x2d, 0x63, 0x6f, 0x70, 0x79, 0x00, 0x04, 0x00, 0x03, 0x00,
+    ];
+
+    let msg = parse_and_round_trip(&raw);
+
+    assert_eq!(
+        msg,
+        EthtoolMessage {
+            cmd: EthtoolCmd::FeatureSetReply,
+            nlas: vec![
+                EthtoolAttr::Feature(EthtoolFeatureAttr::Header(vec![
+                    EthtoolHeader::DevIndex(2),
+                    EthtoolHeader::DevName("dummy0".to_string()),
+                ])),
+                EthtoolAttr::Feature(EthtoolFeatureAttr::Wanted(
+                    EthtoolBitset {
+                        nomask: false,
+                        size: 64,
+                        value: EthtoolBitsetValue::Bits(Vec::new()),
+                    }
+                )),
+                EthtoolAttr::Feature(EthtoolFeatureAttr::Active(
+                    changeable_nocache_copy()
+                )),
+            ],
+        }
+    );
+    assert_eq!(feature_set_unapplied(msg).unwrap(), Vec::new());
 }
