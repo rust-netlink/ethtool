@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, emit_u64, parse_u32, parse_u64, parse_u8, DecodeError,
-    DefaultNla, Emitable, ErrorContext, Nla, NlaBuffer, NlasIterator,
-    Parseable, NLA_F_NESTED,
+    append_u32, append_u64, parse_u32, parse_u64, parse_u8, DecodeError,
+    DefaultNla, Emitable, EncodeError, ErrorContext, Nla, NlaBuffer,
+    NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -28,13 +28,6 @@ pub enum EthtoolPauseStatAttr {
 }
 
 impl Nla for EthtoolPauseStatAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Rx(_) | Self::Tx(_) | Self::TxPauseStormEvents(_) => 8,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Rx(_) => ETHTOOL_A_PAUSE_STAT_RX_FRAMES,
@@ -46,22 +39,19 @@ impl Nla for EthtoolPauseStatAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Rx(value)
             | Self::Tx(value)
-            | Self::TxPauseStormEvents(value) => {
-                emit_u64(buffer, *value).unwrap()
-            }
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            | Self::TxPauseStormEvents(value) => append_u64(out, *value),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolPauseStatAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolPauseStatAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_PAUSE_STAT_TX_FRAMES => Self::Tx(
@@ -96,16 +86,6 @@ pub enum EthtoolPauseAttr {
 }
 
 impl Nla for EthtoolPauseAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::AutoNeg(_) | Self::Rx(_) | Self::Tx(_) => 1,
-            Self::Stats(ref nlas) => nlas.as_slice().buffer_len(),
-            Self::StatsSrc(_) => 4,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_PAUSE_HEADER | NLA_F_NESTED,
@@ -118,32 +98,30 @@ impl Nla for EthtoolPauseAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
             Self::AutoNeg(value) | Self::Rx(value) | Self::Tx(value) => {
-                buffer[0] = *value as u8
+                out.push(*value as u8)
             }
-            Self::Stats(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::StatsSrc(value) => emit_u32(buffer, *value).unwrap(),
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            Self::Stats(ref nlas) => nlas.as_slice().emit(out)?,
+            Self::StatsSrc(value) => append_u32(out, *value),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolPauseAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolPauseAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_PAUSE_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse pause header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -166,10 +144,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             ETHTOOL_A_PAUSE_STATS => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse pause stats attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolPauseStatAttr::parse(nla).context(error_msg)?;
+                        EthtoolPauseStatAttr::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Stats(nlas)
@@ -189,11 +166,9 @@ pub(crate) fn parse_pause_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg =
-            format!("Failed to parse ethtool pause message attribute {nla:?}");
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolPauseAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool pause message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolPauseAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Pause(parsed));
     }
     Ok(nlas)

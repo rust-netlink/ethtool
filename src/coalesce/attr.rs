@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
-    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    append_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    EncodeError, ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable,
+    NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -55,13 +56,6 @@ pub enum EthtoolCoalesceIrqModerationAttr {
 }
 
 impl Nla for EthtoolCoalesceIrqModerationAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Usec(_) | Self::Pkts(_) | Self::Comps(_) => 4,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Usec(_) => ETHTOOL_A_IRQ_MODERATION_USEC,
@@ -71,20 +65,19 @@ impl Nla for EthtoolCoalesceIrqModerationAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Usec(d) | Self::Pkts(d) | Self::Comps(d) => {
-                emit_u32(buffer, *d).unwrap()
+                append_u32(out, *d)
             }
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolCoalesceIrqModerationAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolCoalesceIrqModerationAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_IRQ_MODERATION_USEC => Self::Usec(
@@ -113,13 +106,6 @@ pub enum EthtoolCoalesceProfileAttr {
 }
 
 impl Nla for EthtoolCoalesceProfileAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::IrqModeration(nlas) => nlas.as_slice().buffer_len(),
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::IrqModeration(_) => {
@@ -129,26 +115,24 @@ impl Nla for EthtoolCoalesceProfileAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::IrqModeration(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            Self::IrqModeration(ref nlas) => nlas.as_slice().emit(out)?,
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolCoalesceProfileAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolCoalesceProfileAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_PROFILE_IRQ_MODERATION => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse irq moderation attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
-                    let parsed = EthtoolCoalesceIrqModerationAttr::parse(nla)
+                for nla in NlasIterator::new(payload).context(error_msg)? {
+                    let parsed = EthtoolCoalesceIrqModerationAttr::parse(&nla)
                         .context(error_msg)?;
                     nlas.push(parsed);
                 }
@@ -166,10 +150,9 @@ fn parse_profile_nlas(
 ) -> Result<Vec<EthtoolCoalesceProfileAttr>, DecodeError> {
     let mut nlas = Vec::new();
     let error_msg = "failed to parse coalesce profile attributes";
-    for nla in NlasIterator::new(payload) {
-        let nla = &nla.context(error_msg)?;
+    for nla in NlasIterator::new(payload).context(error_msg)? {
         let parsed =
-            EthtoolCoalesceProfileAttr::parse(nla).context(error_msg)?;
+            EthtoolCoalesceProfileAttr::parse(&nla).context(error_msg)?;
         nlas.push(parsed);
     }
     Ok(nlas)
@@ -213,45 +196,6 @@ pub enum EthtoolCoalesceAttr {
 }
 
 impl Nla for EthtoolCoalesceAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::RxUsecs(_)
-            | Self::RxMaxFrames(_)
-            | Self::RxUsecsIrq(_)
-            | Self::RxMaxFramesIrq(_)
-            | Self::TxUsecs(_)
-            | Self::TxMaxFrames(_)
-            | Self::TxUsecsIrq(_)
-            | Self::TxMaxFramesIrq(_)
-            | Self::StatsBlockUsecs(_)
-            | Self::PktRateLow(_)
-            | Self::RxUsecsLow(_)
-            | Self::RxMaxFramesLow(_)
-            | Self::TxUsecsLow(_)
-            | Self::TxMaxFramesLow(_)
-            | Self::PktRateHigh(_)
-            | Self::RxUsecsHigh(_)
-            | Self::RxMaxFramesHigh(_)
-            | Self::TxUsecsHigh(_)
-            | Self::TxMaxFramesHigh(_)
-            | Self::RateSampleInterval(_)
-            | Self::TxAggrMaxBytes(_)
-            | Self::TxAggrMaxFrames(_)
-            | Self::TxAggrTimeUsecs(_)
-            | Self::RxCqeFrames(_)
-            | Self::RxCqeNsecs(_) => 4,
-            Self::UseAdaptiveRx(_)
-            | Self::UseAdaptiveTx(_)
-            | Self::UseCqeModeTx(_)
-            | Self::UseCqeModeRx(_) => 1,
-            Self::RxProfile(nlas) | Self::TxProfile(nlas) => {
-                nlas.as_slice().buffer_len()
-            }
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_COALESCE_HEADER | NLA_F_NESTED,
@@ -292,10 +236,10 @@ impl Nla for EthtoolCoalesceAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
+            Self::Other(ref attr) => attr.emit_value(out)?,
             Self::RxUsecs(d)
             | Self::RxMaxFrames(d)
             | Self::RxUsecsIrq(d)
@@ -320,31 +264,29 @@ impl Nla for EthtoolCoalesceAttr {
             | Self::TxAggrMaxFrames(d)
             | Self::TxAggrTimeUsecs(d)
             | Self::RxCqeFrames(d)
-            | Self::RxCqeNsecs(d) => emit_u32(buffer, *d).unwrap(),
+            | Self::RxCqeNsecs(d) => append_u32(out, *d),
             Self::UseAdaptiveRx(d)
             | Self::UseAdaptiveTx(d)
             | Self::UseCqeModeTx(d)
-            | Self::UseCqeModeRx(d) => buffer[0] = (*d).into(),
+            | Self::UseCqeModeRx(d) => out.push((*d).into()),
             Self::RxProfile(ref nlas) | Self::TxProfile(ref nlas) => {
-                nlas.as_slice().emit(buffer)
+                nlas.as_slice().emit(out)?
             }
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolCoalesceAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolCoalesceAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_COALESCE_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse coalesce header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -535,12 +477,9 @@ pub(crate) fn parse_coalesce_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg = format!(
-            "Failed to parse ethtool coalesce message attribute {nla:?}"
-        );
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolCoalesceAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool coalesce message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolCoalesceAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Coalesce(parsed));
     }
     Ok(nlas)

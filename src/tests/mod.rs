@@ -18,12 +18,10 @@ use netlink_packet_generic::GenlHeader;
 /// can be emitted back byte for byte.
 fn parse_and_round_trip(raw: &[u8]) -> EthtoolMessage {
     let header = GenlHeader::parse(raw).unwrap();
-    let msg =
-        EthtoolMessage::parse_with_param(&raw[header.buffer_len()..], header)
-            .unwrap();
-    let mut buffer = vec![0; msg.buffer_len() + header.buffer_len()];
-    header.emit(&mut buffer);
-    msg.emit(&mut buffer[header.buffer_len()..]);
+    let msg = EthtoolMessage::parse_with_param(&raw[4..], header).unwrap();
+    let mut buffer = Vec::new();
+    header.emit(&mut buffer).unwrap();
+    msg.emit(&mut buffer).unwrap();
     assert_eq!(buffer, raw);
     msg
 }

@@ -145,9 +145,9 @@ fn test_building_pause_set_netdevsim() {
         cmd: EthtoolCmd::PauseSet.into(),
         version: 1,
     };
-    let mut buffer = vec![0; header.buffer_len() + msg.buffer_len()];
-    header.emit(&mut buffer);
-    msg.emit(&mut buffer[header.buffer_len()..]);
+    let mut buffer = Vec::new();
+    header.emit(&mut buffer).unwrap();
+    msg.emit(&mut buffer).unwrap();
 
     assert_eq!(buffer, raw_request);
 }

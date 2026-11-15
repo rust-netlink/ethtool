@@ -2,8 +2,8 @@
 
 use log::warn;
 use netlink_packet_core::{
-    emit_u32, parse_string, parse_u32, DecodeError, Emitable, ErrorContext,
-    Nla, NlasIterator, NLA_F_NESTED,
+    append_u32, parse_string, parse_u32, DecodeError, Emitable, EncodeError,
+    ErrorContext, Nla, NlasIterator, NLA_F_NESTED,
 };
 
 const ETHTOOL_A_BITSET_NOMASK: u16 = 1;
@@ -52,8 +52,7 @@ impl EthtoolBitset {
         let mut value = None;
         let mut mask = None;
         let error_msg = "failed to parse bitset attributes";
-        for nla in NlasIterator::new(payload) {
-            let nla = &nla.context(error_msg)?;
+        for nla in NlasIterator::new(payload).context(error_msg)? {
             match nla.kind() {
                 ETHTOOL_A_BITSET_NOMASK => nomask = true,
                 ETHTOOL_A_BITSET_SIZE => {
@@ -107,8 +106,7 @@ impl EthtoolBitset {
 fn parse_bits(raw: &[u8]) -> Result<Vec<EthtoolBit>, DecodeError> {
     let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS attributes";
     let mut bits = Vec::new();
-    for bit_nla in NlasIterator::new(raw) {
-        let bit_nla = &bit_nla.context(error_msg)?;
+    for bit_nla in NlasIterator::new(raw).context(error_msg)? {
         match bit_nla.kind() {
             ETHTOOL_A_BITSET_BITS_BIT => {
                 bits.push(parse_bit(bit_nla.value())?);
@@ -128,8 +126,7 @@ fn parse_bit(raw: &[u8]) -> Result<EthtoolBit, DecodeError> {
     let error_msg = "Failed to parse ETHTOOL_A_BITSET_BITS_BIT attributes";
     let mut bit = EthtoolBit::default();
     let mut index_found = false;
-    for nla in NlasIterator::new(raw) {
-        let nla = &nla.context(error_msg)?;
+    for nla in NlasIterator::new(raw).context(error_msg)? {
         let payload = nla.value();
         match nla.kind() {
             ETHTOOL_A_BITSET_BIT_INDEX => {
@@ -172,179 +169,109 @@ fn parse_u32_words(raw: &[u8]) -> Result<Vec<u32>, DecodeError> {
         .collect())
 }
 
-const fn align4(len: usize) -> usize {
-    (len + 3) & !3
-}
-
-const fn nla_len(value_len: usize) -> usize {
-    align4(value_len) + 4
-}
-
 struct BitsetFlag(u16);
 
 impl Nla for BitsetFlag {
-    fn value_len(&self) -> usize {
-        0
-    }
-
     fn kind(&self) -> u16 {
         self.0
     }
 
-    fn emit_value(&self, _buffer: &mut [u8]) {}
+    fn emit_value(&self, _out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        Ok(())
+    }
 }
 
 struct BitsetU32(u16, u32);
 
 impl Nla for BitsetU32 {
-    fn value_len(&self) -> usize {
-        4
-    }
-
     fn kind(&self) -> u16 {
         self.0
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
-        emit_u32(buffer, self.1).unwrap();
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        append_u32(out, self.1);
+        Ok(())
     }
 }
 
 struct BitsetStr<'a>(u16, &'a str);
 
 impl Nla for BitsetStr<'_> {
-    fn value_len(&self) -> usize {
-        self.1.len() + 1
-    }
-
     fn kind(&self) -> u16 {
         self.0
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
-        buffer[..self.1.len()].copy_from_slice(self.1.as_bytes());
-        buffer[self.1.len()] = 0;
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        out.extend_from_slice(self.1.as_bytes());
+        out.push(0);
+        Ok(())
     }
 }
 
 struct BitsetWords<'a>(u16, &'a [u32]);
 
 impl Nla for BitsetWords<'_> {
-    fn value_len(&self) -> usize {
-        self.1.len() * 4
-    }
-
     fn kind(&self) -> u16 {
         self.0
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
-        for (i, word) in self.1.iter().enumerate() {
-            emit_u32(&mut buffer[i * 4..], *word).unwrap();
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        for word in self.1 {
+            append_u32(out, *word);
         }
+        Ok(())
     }
 }
 
 struct BitsetBitNla<'a>(&'a EthtoolBit, bool);
 
 impl Nla for BitsetBitNla<'_> {
-    fn value_len(&self) -> usize {
-        let mut len = nla_len(4); // index
-        len += nla_len(self.0.name.len() + 1); // name
-        if self.1 && self.0.value {
-            len += nla_len(0); // value flag, only for masked bitsets
-        }
-        len
-    }
-
     fn kind(&self) -> u16 {
         ETHTOOL_A_BITSET_BITS_BIT | NLA_F_NESTED
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
-        let index = BitsetU32(ETHTOOL_A_BITSET_BIT_INDEX, self.0.index);
-        let name = BitsetStr(ETHTOOL_A_BITSET_BIT_NAME, self.0.name.as_str());
-        let mut offset = 0;
-        index.emit(&mut buffer[offset..]);
-        offset += index.buffer_len();
-        name.emit(&mut buffer[offset..]);
-        offset += name.buffer_len();
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        BitsetU32(ETHTOOL_A_BITSET_BIT_INDEX, self.0.index).emit(out)?;
+        BitsetStr(ETHTOOL_A_BITSET_BIT_NAME, self.0.name.as_str()).emit(out)?;
         if self.1 && self.0.value {
-            let value = BitsetFlag(ETHTOOL_A_BITSET_BIT_VALUE);
-            value.emit(&mut buffer[offset..]);
+            BitsetFlag(ETHTOOL_A_BITSET_BIT_VALUE).emit(out)?;
         }
+        Ok(())
     }
 }
 
 struct BitsetBitsNla<'a>(&'a [EthtoolBit], bool);
 
 impl Nla for BitsetBitsNla<'_> {
-    fn value_len(&self) -> usize {
-        self.0
-            .iter()
-            .map(|bit| nla_len(BitsetBitNla(bit, self.1).value_len()))
-            .sum()
-    }
-
     fn kind(&self) -> u16 {
         ETHTOOL_A_BITSET_BITS | NLA_F_NESTED
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
-        let mut offset = 0;
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         for bit in self.0 {
-            let nla = BitsetBitNla(bit, self.1);
-            nla.emit(&mut buffer[offset..]);
-            offset += nla.buffer_len();
+            BitsetBitNla(bit, self.1).emit(out)?;
         }
+        Ok(())
     }
 }
 
 impl Emitable for EthtoolBitset {
-    fn buffer_len(&self) -> usize {
-        let mut len = 0;
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         if self.nomask {
-            len += nla_len(0);
+            BitsetFlag(ETHTOOL_A_BITSET_NOMASK).emit(out)?;
         }
-        len += nla_len(4);
+        BitsetU32(ETHTOOL_A_BITSET_SIZE, self.size).emit(out)?;
         match &self.value {
             EthtoolBitsetValue::Bits(bits) => {
-                len += nla_len(BitsetBitsNla(bits, !self.nomask).value_len());
+                BitsetBitsNla(bits, !self.nomask).emit(out)?;
             }
             EthtoolBitsetValue::Compact { value, mask } => {
-                len += nla_len(value.len() * 4);
+                BitsetWords(ETHTOOL_A_BITSET_VALUE, value).emit(out)?;
                 if !self.nomask {
-                    len += nla_len(mask.len() * 4);
+                    BitsetWords(ETHTOOL_A_BITSET_MASK, mask).emit(out)?;
                 }
             }
         }
-        len
-    }
-
-    fn emit(&self, buffer: &mut [u8]) {
-        let mut offset = 0;
-        if self.nomask {
-            let nla = BitsetFlag(ETHTOOL_A_BITSET_NOMASK);
-            nla.emit(&mut buffer[offset..]);
-            offset += nla.buffer_len();
-        }
-        let size = BitsetU32(ETHTOOL_A_BITSET_SIZE, self.size);
-        size.emit(&mut buffer[offset..]);
-        offset += size.buffer_len();
-        match &self.value {
-            EthtoolBitsetValue::Bits(bits) => {
-                let nla = BitsetBitsNla(bits, !self.nomask);
-                nla.emit(&mut buffer[offset..]);
-            }
-            EthtoolBitsetValue::Compact { value, mask } => {
-                let nla = BitsetWords(ETHTOOL_A_BITSET_VALUE, value);
-                nla.emit(&mut buffer[offset..]);
-                offset += nla.buffer_len();
-                if !self.nomask {
-                    let nla = BitsetWords(ETHTOOL_A_BITSET_MASK, mask);
-                    nla.emit(&mut buffer[offset..]);
-                }
-            }
-        }
+        Ok(())
     }
 }

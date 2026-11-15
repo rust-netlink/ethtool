@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
-    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    append_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    EncodeError, ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable,
+    NLA_F_NESTED,
 };
 
 use crate::{bitset::EthtoolBitset, EthtoolAttr, EthtoolHeader};
@@ -66,19 +67,6 @@ pub enum EthtoolLinkModeAttr {
 }
 
 impl Nla for EthtoolLinkModeAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::Autoneg(_)
-            | Self::Duplex(_)
-            | Self::ControllerSubordinateCfg(_)
-            | Self::ControllerSubordinateState(_) => 1,
-            Self::Ours(bitset) | Self::Peer(bitset) => bitset.buffer_len(),
-            Self::Speed(_) | Self::Lanes(_) => 4,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_LINKMODES_HEADER | NLA_F_NESTED,
@@ -98,35 +86,31 @@ impl Nla for EthtoolLinkModeAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit_value(buffer),
-            Self::Autoneg(value) => buffer[0] = *value as u8,
-            Self::Duplex(value) => buffer[0] = u8::from(*value),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
+            Self::Other(ref attr) => attr.emit_value(out)?,
+            Self::Autoneg(value) => out.push(*value as u8),
+            Self::Duplex(value) => out.push(u8::from(*value)),
             Self::ControllerSubordinateCfg(value)
-            | Self::ControllerSubordinateState(value) => buffer[0] = *value,
-            Self::Speed(value) | Self::Lanes(value) => {
-                emit_u32(buffer, *value).unwrap()
-            }
-            Self::Ours(bitset) | Self::Peer(bitset) => bitset.emit(buffer),
+            | Self::ControllerSubordinateState(value) => out.push(*value),
+            Self::Speed(value) | Self::Lanes(value) => append_u32(out, *value),
+            Self::Ours(bitset) | Self::Peer(bitset) => bitset.emit(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolLinkModeAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolLinkModeAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_LINKMODES_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse link_mode header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -179,12 +163,9 @@ pub(crate) fn parse_link_mode_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg = format!(
-            "Failed to parse ethtool link_mode message attribute {nla:?}"
-        );
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolLinkModeAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool link_mode message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolLinkModeAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::LinkMode(parsed));
     }
     Ok(nlas)

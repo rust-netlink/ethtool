@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use netlink_packet_core::{DecodeError, Emitable, Nla, ParseableParametrized};
+use netlink_packet_core::{
+    DecodeError, Emitable, EncodeError, Nla, ParseableParametrized,
+};
 use netlink_packet_generic::{GenlFamily, GenlHeader};
 
 use crate::{
@@ -106,20 +108,6 @@ pub enum EthtoolAttr {
 }
 
 impl Nla for EthtoolAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Pause(attr) => attr.value_len(),
-            Self::Feature(attr) => attr.value_len(),
-            Self::LinkMode(attr) => attr.value_len(),
-            Self::Ring(attr) => attr.value_len(),
-            Self::Coalesce(attr) => attr.value_len(),
-            Self::TsInfo(attr) => attr.value_len(),
-            Self::Fec(attr) => attr.value_len(),
-            Self::Channel(attr) => attr.value_len(),
-            Self::ModuleEEPROM(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Pause(attr) => attr.kind(),
@@ -134,17 +122,17 @@ impl Nla for EthtoolAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Pause(attr) => attr.emit_value(buffer),
-            Self::Feature(attr) => attr.emit_value(buffer),
-            Self::LinkMode(attr) => attr.emit_value(buffer),
-            Self::Ring(attr) => attr.emit_value(buffer),
-            Self::Coalesce(attr) => attr.emit_value(buffer),
-            Self::TsInfo(attr) => attr.emit_value(buffer),
-            Self::Fec(attr) => attr.emit_value(buffer),
-            Self::Channel(attr) => attr.emit_value(buffer),
-            Self::ModuleEEPROM(attr) => attr.emit_value(buffer),
+            Self::Pause(attr) => attr.emit_value(out),
+            Self::Feature(attr) => attr.emit_value(out),
+            Self::LinkMode(attr) => attr.emit_value(out),
+            Self::Ring(attr) => attr.emit_value(out),
+            Self::Coalesce(attr) => attr.emit_value(out),
+            Self::TsInfo(attr) => attr.emit_value(out),
+            Self::Fec(attr) => attr.emit_value(out),
+            Self::Channel(attr) => attr.emit_value(out),
+            Self::ModuleEEPROM(attr) => attr.emit_value(out),
         }
     }
 }
@@ -357,12 +345,8 @@ impl EthtoolMessage {
 }
 
 impl Emitable for EthtoolMessage {
-    fn buffer_len(&self) -> usize {
-        self.nlas.as_slice().buffer_len()
-    }
-
-    fn emit(&self, buffer: &mut [u8]) {
-        self.nlas.as_slice().emit(buffer)
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.nlas.as_slice().emit(out)
     }
 }
 

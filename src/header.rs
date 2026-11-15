@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-use std::ffi::CString;
-
 use netlink_packet_core::{
-    emit_u32, parse_string, parse_u32, DecodeError, DefaultNla, ErrorContext,
-    Nla, NlaBuffer, Parseable,
+    append_u32, parse_string, parse_u32, DecodeError, DefaultNla, EncodeError,
+    ErrorContext, Nla, NlaBuffer, Parseable,
 };
 
 pub(crate) const ALTIFNAMSIZ: usize = 128;
@@ -21,20 +19,6 @@ pub enum EthtoolHeader {
 }
 
 impl Nla for EthtoolHeader {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::DevIndex(_) | Self::Flags(_) => 4,
-            Self::DevName(s) => {
-                if s.len() + 1 > ALTIFNAMSIZ {
-                    ALTIFNAMSIZ
-                } else {
-                    s.len() + 1
-                }
-            }
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::DevIndex(_) => ETHTOOL_A_HEADER_DEV_INDEX,
@@ -44,23 +28,22 @@ impl Nla for EthtoolHeader {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::DevIndex(value) | Self::Flags(value) => {
-                emit_u32(buffer, *value).unwrap()
+                append_u32(out, *value);
             }
             Self::DevName(s) => {
-                str_to_zero_ended_u8_array(s, buffer, ALTIFNAMSIZ)
+                append_zero_ended_string(out, s, ALTIFNAMSIZ);
             }
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolHeader
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolHeader {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_HEADER_DEV_INDEX => Self::DevIndex(
@@ -82,18 +65,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
     }
 }
 
-fn str_to_zero_ended_u8_array(
-    src_str: &str,
-    buffer: &mut [u8],
-    max_size: usize,
-) {
-    if let Ok(src_cstring) = CString::new(src_str.as_bytes()) {
-        let src_null_ended_str = src_cstring.into_bytes_with_nul();
-        if src_null_ended_str.len() > max_size {
-            buffer[..max_size].clone_from_slice(&src_null_ended_str[..max_size])
-        } else {
-            buffer[..src_null_ended_str.len()]
-                .clone_from_slice(&src_null_ended_str)
-        }
-    }
+fn append_zero_ended_string(out: &mut Vec<u8>, src: &str, max_size: usize) {
+    let mut bytes = src.as_bytes().to_vec();
+    bytes.push(0);
+    let len = bytes.len().min(max_size);
+    out.extend_from_slice(&bytes[..len]);
 }

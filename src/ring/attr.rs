@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
-    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    append_u32, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
+    EncodeError, ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable,
+    NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -40,25 +41,6 @@ pub enum EthtoolRingAttr {
 }
 
 impl Nla for EthtoolRingAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::TcpDataSplit(_) => 1,
-            Self::TxPush(_) => 1,
-            Self::RxMax(_)
-            | Self::RxMiniMax(_)
-            | Self::RxJumboMax(_)
-            | Self::TxMax(_)
-            | Self::Rx(_)
-            | Self::RxMini(_)
-            | Self::RxJumbo(_)
-            | Self::Tx(_)
-            | Self::RxBufLen(_)
-            | Self::CqeSize(_) => 4,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_RINGS_HEADER | NLA_F_NESTED,
@@ -78,9 +60,9 @@ impl Nla for EthtoolRingAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
             Self::RxMax(d)
             | Self::RxMiniMax(d)
             | Self::RxJumboMax(d)
@@ -90,27 +72,25 @@ impl Nla for EthtoolRingAttr {
             | Self::RxJumbo(d)
             | Self::RxBufLen(d)
             | Self::CqeSize(d)
-            | Self::Tx(d) => emit_u32(buffer, *d).unwrap(),
-            Self::TcpDataSplit(d) => buffer[0] = *d,
-            Self::TxPush(d) => buffer[0] = *d as u8,
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            | Self::Tx(d) => append_u32(out, *d),
+            Self::TcpDataSplit(d) => out.push(*d),
+            Self::TxPush(d) => out.push(*d as u8),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolRingAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolRingAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_RINGS_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse ring header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -177,11 +157,9 @@ pub(crate) fn parse_ring_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg =
-            format!("Failed to parse ethtool ring message attribute {nla:?}");
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolRingAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool ring message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolRingAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Ring(parsed));
     }
     Ok(nlas)
