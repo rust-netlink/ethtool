@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, emit_u64, parse_u32, parse_u8, DecodeError, DefaultNla, Emitable,
-    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    append_u32, append_u64, parse_u32, parse_u8, DecodeError, DefaultNla,
+    Emitable, EncodeError, ErrorContext, Nla, NlaBuffer, NlasIterator,
+    Parseable, NLA_F_NESTED,
 };
 
 use crate::{bitset::EthtoolBitset, EthtoolAttr, EthtoolHeader};
@@ -35,17 +36,6 @@ pub enum EthtoolFecAttr {
 }
 
 impl Nla for EthtoolFecAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::Modes(bitset) => bitset.buffer_len(),
-            Self::Auto(_) => 1,
-            Self::Active(_) => 4,
-            Self::Stats(s) => s.as_slice().buffer_len(),
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_FEC_HEADER | NLA_F_NESTED,
@@ -57,33 +47,29 @@ impl Nla for EthtoolFecAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
-            Self::Other(ref attr) => attr.emit_value(buffer),
-            Self::Modes(bitset) => bitset.emit(buffer),
-            Self::Auto(value) => buffer[0] = *value as u8,
-            Self::Active(value) => {
-                emit_u32(buffer, u32::from(value.clone())).unwrap()
-            }
-            Self::Stats(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
+            Self::Other(ref attr) => attr.emit_value(out)?,
+            Self::Modes(bitset) => bitset.emit(out)?,
+            Self::Auto(value) => out.push(*value as u8),
+            Self::Active(value) => append_u32(out, u32::from(value.clone())),
+            Self::Stats(ref nlas) => nlas.as_slice().emit(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolFecAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolFecAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_FEC_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse link_mode header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -107,11 +93,11 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
             ),
             ETHTOOL_A_FEC_STATS => {
                 let mut stats = Vec::new();
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(format!(
-                        "invalid ETHTOOL_A_FEC_STATS {payload:?}"
-                    ))?;
-                    let parsed = EthtoolFecStat::parse(nla)?;
+                let error_msg =
+                    format!("invalid ETHTOOL_A_FEC_STATS {payload:?}");
+                for nla in NlasIterator::new(payload).context(&error_msg)? {
+                    let parsed =
+                        EthtoolFecStat::parse(&nla).context(&error_msg)?;
                     stats.push(parsed);
                 }
                 Self::Stats(stats)
@@ -127,11 +113,9 @@ pub(crate) fn parse_fec_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg =
-            format!("Failed to parse ethtool fec message attribute {:?}", nla);
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolFecAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool fec message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolFecAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Fec(parsed));
     }
     Ok(nlas)
@@ -204,15 +188,6 @@ pub enum EthtoolFecStat {
 }
 
 impl Nla for EthtoolFecStat {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Corrected(values)
-            | Self::Uncorrected(values)
-            | Self::CorrectBits(values) => values.len() * 8,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Corrected(_) => ETHTOOL_A_FEC_STAT_CORRECTED,
@@ -222,17 +197,18 @@ impl Nla for EthtoolFecStat {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Corrected(values)
             | Self::Uncorrected(values)
             | Self::CorrectBits(values) => {
-                for (i, value) in values.iter().enumerate() {
-                    emit_u64(&mut buffer[i * 8..], *value).unwrap();
+                for value in values {
+                    append_u64(out, *value);
                 }
             }
-            Self::Other(attr) => attr.emit_value(buffer),
+            Self::Other(attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
@@ -252,10 +228,8 @@ fn parse_u64_values(payload: &[u8]) -> Result<Vec<u64>, DecodeError> {
         .collect())
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolFecStat
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolFecStat {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_FEC_STAT_CORRECTED => {

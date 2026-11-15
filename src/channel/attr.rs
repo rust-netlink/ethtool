@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 use netlink_packet_core::{
-    emit_u32, parse_u32, DecodeError, DefaultNla, Emitable, ErrorContext, Nla,
-    NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
+    append_u32, parse_u32, DecodeError, DefaultNla, Emitable, EncodeError,
+    ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable, NLA_F_NESTED,
 };
 
 use crate::{EthtoolAttr, EthtoolHeader};
@@ -32,21 +32,6 @@ pub enum EthtoolChannelAttr {
 }
 
 impl Nla for EthtoolChannelAttr {
-    fn value_len(&self) -> usize {
-        match self {
-            Self::Header(hdrs) => hdrs.as_slice().buffer_len(),
-            Self::RxMax(_)
-            | Self::TxMax(_)
-            | Self::OtherMax(_)
-            | Self::CombinedMax(_)
-            | Self::RxCount(_)
-            | Self::TxCount(_)
-            | Self::OtherCount(_)
-            | Self::CombinedCount(_) => 4,
-            Self::Other(attr) => attr.value_len(),
-        }
-    }
-
     fn kind(&self) -> u16 {
         match self {
             Self::Header(_) => ETHTOOL_A_CHANNELS_HEADER | NLA_F_NESTED,
@@ -62,9 +47,9 @@ impl Nla for EthtoolChannelAttr {
         }
     }
 
-    fn emit_value(&self, buffer: &mut [u8]) {
+    fn emit_value(&self, out: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
-            Self::Header(ref nlas) => nlas.as_slice().emit(buffer),
+            Self::Header(ref nlas) => nlas.as_slice().emit(out)?,
             Self::RxMax(d)
             | Self::TxMax(d)
             | Self::OtherMax(d)
@@ -72,25 +57,23 @@ impl Nla for EthtoolChannelAttr {
             | Self::RxCount(d)
             | Self::TxCount(d)
             | Self::OtherCount(d)
-            | Self::CombinedCount(d) => emit_u32(buffer, *d).unwrap(),
-            Self::Other(ref attr) => attr.emit_value(buffer),
+            | Self::CombinedCount(d) => append_u32(out, *d),
+            Self::Other(ref attr) => attr.emit_value(out)?,
         }
+        Ok(())
     }
 }
 
-impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
-    for EthtoolChannelAttr
-{
-    fn parse(buf: &NlaBuffer<&'a T>) -> Result<Self, DecodeError> {
+impl<'a> Parseable<NlaBuffer<'a>> for EthtoolChannelAttr {
+    fn parse(buf: &NlaBuffer<'a>) -> Result<Self, DecodeError> {
         let payload = buf.value();
         Ok(match buf.kind() {
             ETHTOOL_A_CHANNELS_HEADER => {
                 let mut nlas = Vec::new();
                 let error_msg = "failed to parse channel header attributes";
-                for nla in NlasIterator::new(payload) {
-                    let nla = &nla.context(error_msg)?;
+                for nla in NlasIterator::new(payload).context(error_msg)? {
                     let parsed =
-                        EthtoolHeader::parse(nla).context(error_msg)?;
+                        EthtoolHeader::parse(&nla).context(error_msg)?;
                     nlas.push(parsed);
                 }
                 Self::Header(nlas)
@@ -140,12 +123,9 @@ pub(crate) fn parse_channel_nlas(
     buffer: &[u8],
 ) -> Result<Vec<EthtoolAttr>, DecodeError> {
     let mut nlas = Vec::new();
-    for nla in NlasIterator::new(buffer) {
-        let error_msg = format!(
-            "Failed to parse ethtool channel message attribute {nla:?}"
-        );
-        let nla = &nla.context(error_msg.clone())?;
-        let parsed = EthtoolChannelAttr::parse(nla).context(error_msg)?;
+    let error_msg = "Failed to parse ethtool channel message attributes";
+    for nla in NlasIterator::new(buffer).context(error_msg)? {
+        let parsed = EthtoolChannelAttr::parse(&nla).context(error_msg)?;
         nlas.push(EthtoolAttr::Channel(parsed));
     }
     Ok(nlas)

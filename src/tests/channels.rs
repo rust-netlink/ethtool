@@ -35,9 +35,9 @@ fn test_channels_get_reply() {
         EthtoolMessage::parse_with_param(&raw[4..], header).unwrap(),
     );
 
-    let mut buffer = vec![0; expected.buffer_len() + header.buffer_len()];
-    header.emit(&mut buffer);
-    expected.emit(&mut buffer[4..]);
+    let mut buffer = Vec::new();
+    header.emit(&mut buffer).unwrap();
+    expected.emit(&mut buffer).unwrap();
     assert_eq!(&buffer, &raw);
 }
 
@@ -58,8 +58,8 @@ fn test_channels_set_rx() {
         ],
     };
 
-    let mut raw = vec![0; msg.buffer_len()];
-    msg.emit(&mut raw);
+    let mut raw = Vec::new();
+    msg.emit(&mut raw).unwrap();
 
     assert_eq!(expected, raw,);
 }
@@ -81,8 +81,8 @@ fn test_channels_set_tx() {
         ],
     };
 
-    let mut raw = vec![0; msg.buffer_len()];
-    msg.emit(&mut raw);
+    let mut raw = Vec::new();
+    msg.emit(&mut raw).unwrap();
 
     assert_eq!(expected, raw,);
 }
@@ -104,8 +104,8 @@ fn test_channels_set_other() {
         ],
     };
 
-    let mut raw = vec![0; msg.buffer_len()];
-    msg.emit(&mut raw);
+    let mut raw = Vec::new();
+    msg.emit(&mut raw).unwrap();
 
     assert_eq!(expected, raw,);
 }
@@ -127,8 +127,8 @@ fn test_channels_set_combined() {
         ],
     };
 
-    let mut raw = vec![0; msg.buffer_len()];
-    msg.emit(&mut raw);
+    let mut raw = Vec::new();
+    msg.emit(&mut raw).unwrap();
 
     assert_eq!(expected, raw,);
 }

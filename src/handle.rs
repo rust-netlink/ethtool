@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures_util::{Stream, StreamExt};
-use genetlink::GenetlinkHandle;
-use netlink_packet_core::DecodeError;
+use genetlink::{GenetlinkError, GenetlinkHandle};
 use netlink_packet_core::{
     NetlinkMessage, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST,
 };
@@ -68,7 +67,7 @@ impl EthtoolHandle {
         impl Stream<
             Item = Result<
                 NetlinkMessage<GenlMessage<EthtoolMessage>>,
-                DecodeError,
+                GenetlinkError,
             >,
         >,
         EthtoolError,
